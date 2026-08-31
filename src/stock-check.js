@@ -209,7 +209,7 @@ function setup() {
   const showStock = () => { regular.forEach(child => { child.style.display = 'none'; }); panel.classList.add('is-visible'); nav.querySelectorAll('a').forEach(item => item.classList.remove('active')); link.classList.add('active'); render(); };
   const showMain = () => { regular.forEach(child => { child.style.display = ''; }); panel.classList.remove('is-visible'); link.classList.remove('active'); nav.querySelector('a')?.classList.add('active'); };
   link.onclick = showStock;
-  nav.querySelectorAll('a:not(.stock-nav)').forEach(item => { item.onclick = showMain; });
+
 }
 
 new MutationObserver(setup).observe(document.body, { childList: true, subtree: true });
