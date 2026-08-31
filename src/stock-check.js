@@ -94,14 +94,12 @@ async function checkItem(id) {
     const response = await fetch(`${STOCK_API}/api/stock-search?article=${encodeURIComponent(parsed.article)}`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Не удалось открыть таблицу остатков');
-    state.results = state.results.filter(result => result.itemId !== id);
-    state.results.push({ ...parsed, itemId: id, source: item.file.name, page: item.page, row: item.row, matches: data });
+    state.results.push({ ...parsed, resultId: makeId(), itemId: id, source: item.file.name, page: item.page, row: item.row, matches: data });
     item.status = data.length ? `Найдено коробок: ${data.length}` : 'В остатках не найдено';
     item.ok = Boolean(data.length);
   } catch (error) {
     item.status = error.message;
     item.ok = false;
-    state.results = state.results.filter(result => result.itemId !== id);
   }
   render();
 }
@@ -109,6 +107,11 @@ async function checkItem(id) {
 function removeItem(id) {
   state.items = state.items.filter(item => item.id !== id);
   state.results = state.results.filter(result => result.itemId !== id);
+  render();
+}
+
+function removeResult(resultId) {
+  state.results = state.results.filter(result => result.resultId !== resultId);
   render();
 }
 
@@ -150,16 +153,17 @@ function render() {
   const panel = document.querySelector('.stock-panel');
   if (!panel) return;
   const files = state.items.map(item => `<div class="stock-file"><div class="stock-file-main"><span class="stock-pdf-icon">PDF</span><span class="stock-file-name" title="${escapeHtml(item.file.name)}">${escapeHtml(item.file.name)}</span></div><label class="stock-field"><span>Страница</span><input data-id="${item.id}" data-field="page" type="number" min="1" value="${item.page}" aria-label="Страница"></label><label class="stock-field"><span>Строка</span><input data-id="${item.id}" data-field="row" type="number" min="1" value="${item.row}" aria-label="Строка"></label><button data-check="${item.id}" type="button">Проверить</button><button class="stock-remove" data-remove="${item.id}" type="button">Удалить</button><span class="stock-file-status ${item.ok ? 'ok' : item.status && item.status !== 'Готово' ? 'error' : ''}">${escapeHtml(item.status || 'Укажите страницу и строку')}</span></div>`).join('');
-  const results = state.results.length ? `<div class="stock-results"><div class="stock-results-head"><h3>Результаты поиска</h3><span class="stock-results-count">Позиций: ${state.results.length}</span><div class="stock-mode"><button type="button" class="${state.mode === 'assembly' ? 'active' : ''}" data-mode="assembly">На сборку</button><button type="button" class="${state.mode === 'print' ? 'active' : ''}" data-mode="print">На печать</button></div></div>${state.results.map(result => `<div class="stock-result">${result.photo ? `<img class="stock-photo" src="${result.photo}" alt="Фото ${escapeHtml(result.article)}">` : '<div class="stock-photo" aria-hidden="true"></div>'}<div><div class="stock-result-main"><span>${escapeHtml(result.article)}</span><span class="stock-tag">${result.qty} шт. · ${escapeHtml(result.market)}</span><small>${escapeHtml(result.source)}, стр. ${result.page}, строка ${result.row}; PDF-коробка: ${escapeHtml(result.box)}</small></div><div class="stock-boxes">${result.matches.length ? result.matches.map(match => `<span class="stock-box">${escapeHtml(match.box || 'Коробка не указана')}${match.level ? ` · ${escapeHtml(match.level)}` : ''} · остаток ${Number(match.stock) || 0} шт.</span>`).join('') : '<span class="stock-empty">В таблице остатков не найдено</span>'}</div></div><button class="stock-remove stock-result-remove" data-remove="${result.itemId}" type="button">Удалить</button></div>`).join('')}<div class="stock-footer"><button class="stock-export" type="button" ${state.results.some(result => result.matches.length) ? '' : 'disabled'}>Скачать Excel</button></div></div>` : '';
+  const results = state.results.length ? `<div class="stock-results"><div class="stock-results-head"><h3>Результаты поиска</h3><span class="stock-results-count">Позиций: ${state.results.length}</span><div class="stock-mode"><button type="button" class="${state.mode === 'assembly' ? 'active' : ''}" data-mode="assembly">На сборку</button><button type="button" class="${state.mode === 'print' ? 'active' : ''}" data-mode="print">На печать</button></div></div>${state.results.map(result => `<div class="stock-result">${result.photo ? `<img class="stock-photo" src="${result.photo}" alt="Фото ${escapeHtml(result.article)}">` : '<div class="stock-photo" aria-hidden="true"></div>'}<div><div class="stock-result-main"><span>${escapeHtml(result.article)}</span><span class="stock-tag">${result.qty} шт. · ${escapeHtml(result.market)}</span><small>${escapeHtml(result.source)}, стр. ${result.page}, строка ${result.row}; PDF-коробка: ${escapeHtml(result.box)}</small></div><div class="stock-boxes">${result.matches.length ? result.matches.map(match => `<span class="stock-box">${escapeHtml(match.box || 'Коробка не указана')}${match.level ? ` · ${escapeHtml(match.level)}` : ''} · остаток ${Number(match.stock) || 0} шт.</span>`).join('') : '<span class="stock-empty">В таблице остатков не найдено</span>'}</div></div><button class="stock-remove stock-result-remove" data-remove-result="${result.resultId}" type="button">Удалить</button></div>`).join('')}<div class="stock-footer"><button class="stock-export" type="button" ${state.results.some(result => result.matches.length) ? '' : 'disabled'}>Скачать Excel</button></div></div>` : '';
   panel.innerHTML = `<div class="panel-head"><div><h2>Проверка остатков</h2><p>Найдите артикулы из PDF в актуальной таблице склада</p></div><div class="step">03</div></div><p class="stock-intro">Загрузите несколько PDF-файлов. Для каждого укажите страницу и номер строки — система покажет фото, все найденные короба и подготовит Excel.</p><div class="stock-upload"><label class="stock-upload-button">Выбрать PDF-файлы<input id="stock-pdf-input" type="file" accept="application/pdf,.pdf" multiple></label><span class="stock-upload-hint">Можно выбрать несколько файлов</span></div><div class="stock-files">${files}</div>${results}`;
   bindPanelEvents();
 }
 
 function bindPanelEvents() {
   const input = document.querySelector('#stock-pdf-input');
-  if (input) input.onchange = () => { state.items.push(...[...input.files].map(file => ({ id: makeId(), file, page: 1, row: 1, status: 'Готово' }))); render(); };
+  if (input) input.onchange = () => { const files = [...input.files]; if (!files.length) return; state.items.push(...files.map(file => ({ id: makeId(), file, page: 1, row: 1, status: 'Готово' }))); input.value = ''; render(); };
   document.querySelectorAll('[data-check]').forEach(button => { button.onclick = () => checkItem(button.dataset.check); });
   document.querySelectorAll('[data-remove]').forEach(button => { button.onclick = () => removeItem(button.dataset.remove); });
+  document.querySelectorAll('[data-remove-result]').forEach(button => { button.onclick = () => removeResult(button.dataset.removeResult); });
   document.querySelectorAll('[data-field]').forEach(field => { field.onchange = () => { const item = state.items.find(candidate => candidate.id === field.dataset.id); if (item) item[field.dataset.field] = field.value; }; });
   document.querySelectorAll('[data-mode]').forEach(button => { button.onclick = () => { state.mode = button.dataset.mode; render(); }; });
   const exportButton = document.querySelector('.stock-export');
