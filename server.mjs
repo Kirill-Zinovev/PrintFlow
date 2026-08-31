@@ -10,7 +10,7 @@ const BASE='\\\\Zzz\\проекты\\база1';
 const PRINT='\\\\Zzz\\печать\\WB';
 const DEFAULT_WB_ROOT=path.join(PRINT,'!1.СРОЧНО WB','срочка за 28.08');
 const DEFAULT_OZON_ROOT=path.join(PRINT,'!2. Срочно OZON','СРОЧНО за 29.08');
-const MAP='C:\\Users\\Пользователь\\Downloads\\Расширения.xlsx';
+const MAP=path.join(process.cwd(),'Расширения.xlsx');
 const allowed=new Set(['.cdr','.tif']);
 const articleRe=/([A-Za-z]{2,4}[0-9]{3,4}\.A[0-9]+)\(([^)]+)\)/i;
 let jobs=[]; let WB_ROOT=DEFAULT_WB_ROOT; let OZON_ROOT=DEFAULT_OZON_ROOT;
