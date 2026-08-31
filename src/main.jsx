@@ -4,6 +4,7 @@ import{Plus,FolderOpen,CheckCircle2,Upload,Download}from'lucide-react';
 import*as XLSX from'xlsx';
 import'./styles.css';
 import'./settings.js';
+import'./stock-check.js';
 const api=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?'http://localhost:4174':window.location.protocol+'//'+window.location.hostname+':4174';
 const map={CBI:'CDR Белая интерьерка',CB:'CDR Белая',CP:'CDR ПРОЗРАЧКА',CPB:'CDR ПРОЗРАЧКА глянец с белым',B:'БУМАГА',G:'Голография',D:'Двусторонние',U3:'УФ ПВХ 3 мм',U5:'УФ ПВХ 5 мм',FP:'УФ планшет',DTF:'ДТФ'};
 function App(){const[a,setA]=useState(''),[m,setM]=useState('WB'),[q,setQ]=useState(1),[rows,setRows]=useState([]),[msg,setMsg]=useState(''),[preview,setPreview]=useState([]),[batchMsg,setBatchMsg]=useState(''),[found,setFound]=useState(null),[dateFrom,setDateFrom]=useState(''),[dateTo,setDateTo]=useState('');

@@ -11,6 +11,7 @@ const PRINT='\\\\Zzz\\печать\\WB';
 const DEFAULT_WB_ROOT=path.join(PRINT,'!1.СРОЧНО WB','срочка за 28.08');
 const DEFAULT_OZON_ROOT=path.join(PRINT,'!2. Срочно OZON','СРОЧНО за 29.08');
 const MAP=path.join(process.cwd(),'Расширения.xlsx');
+const STOCKS_FILE='\\\\Zzz\\проекты\\менеджеры\\FBS\\Остатки Калейдоскоп (Актуальный).xlsx';
 const allowed=new Set(['.cdr','.tif']);
 const articleRe=/([A-Za-z]{2,4}[0-9]{3,4}\.A[0-9]+)\(([^)]+)\)/i;
 let jobs=[]; let WB_ROOT=DEFAULT_WB_ROOT; let OZON_ROOT=DEFAULT_OZON_ROOT;
@@ -44,6 +45,7 @@ app.get('/api/health',(req,res)=>res.json({ok:true,base:BASE,print:PRINT,wbPrint
 app.get('/api/audit',async(req,res)=>{try{const rows=JSON.parse(await fs.readFile(AUDIT_FILE,'utf8'));res.json(Array.isArray(rows)?rows.slice(0,200):[])}catch{res.json([])}});
 app.get('/api/settings',async(req,res)=>res.json({base:BASE,print:PRINT,map:MAP,allowed:[...allowed],refreshSeconds:5,wbRoot:WB_ROOT,ozonRoot:OZON_ROOT}));
 app.post('/api/settings',async(req,res)=>{const wbRoot=String(req.body?.wbRoot||'').trim(),ozonRoot=String(req.body?.ozonRoot||'').trim();if(!validRoot(wbRoot)||!validRoot(ozonRoot))return res.status(422).json({error:'Укажите корректные локальные или сетевые пути для WB и Ozon'});WB_ROOT=path.normalize(wbRoot);OZON_ROOT=path.normalize(ozonRoot);await saveSettings();res.json({ok:true,wbRoot:WB_ROOT,ozonRoot:OZON_ROOT})});
+app.get('/api/stock-search',async(req,res)=>{const article=String(req.query.article||'').trim().toUpperCase();if(!article)return res.json([]);try{const wb=XLSX.readFile(STOCKS_FILE,{cellDates:false}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{defval:''}),byLocation=new Map();for(const row of rows){if(String(row['Артикул']||'').trim().toUpperCase()!==article)continue;const box=String(row['Коробка']||'').trim(),level=String(row['Этаж/БОКС']||'').trim(),key=box+'|'+level,previous=byLocation.get(key)||{article,stock:0,box,level};previous.stock+=Number(row['Количество']||0)||0;byLocation.set(key,previous)}res.json([...byLocation.values()])}catch(error){res.status(500).json({error:`Не удалось открыть таблицу остатков: ${error.message}`})}});
 app.get('/api/report',(req,res)=>{const from=String(req.query.from||'').trim(),to=String(req.query.to||'').trim();const list=jobs.filter(j=>{const d=new Date(j.createdAt||0);return(!from||d>=new Date(from+'T00:00:00'))&&(!to||d<=new Date(to+'T23:59:59'))});const total=list.reduce((s,j)=>s+j.qty,0);res.json({total,wb:list.filter(j=>j.market==='WB').reduce((s,j)=>s+j.qty,0),ozon:list.filter(j=>j.market==='OZON').reduce((s,j)=>s+j.qty,0),waiting:list.filter(j=>j.status==='Ожидает'||j.status==='В печати').reduce((s,j)=>s+j.qty,0),taken:list.filter(j=>j.status==='Забрано').reduce((s,j)=>s+j.qty,0),done:list.filter(j=>j.status==='Напечатано').reduce((s,j)=>s+j.qty,0),errors:list.filter(j=>j.status==='Ошибка').length,rows:list.length})});
 app.get('/api/template.xlsx',(req,res)=>{
   const wb=XLSX.utils.book_new();

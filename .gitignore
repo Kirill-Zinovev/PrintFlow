@@ -1,4 +1,5 @@
 node_modules/
+dist/
 data/*
 !data/.gitkeep
 outputs/
@@ -6,4 +7,3 @@ work/
 .env
 .env.*
 !.env.example
-
