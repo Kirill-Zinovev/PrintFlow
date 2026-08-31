@@ -25,7 +25,13 @@ style.textContent = `
 `;
 document.head.append(style);
 
-const state = { items: [], results: [], mode: 'assembly' };
+const boardStyle = document.createElement('style');
+boardStyle.textContent = `
+.stock-buckets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:24px}.stock-bucket{min-width:0;min-height:260px;border:1px solid #e4e9f0;border-radius:12px;padding:14px;background:#fbfcfe;transition:border-color .15s,background .15s}.stock-bucket.assembly{border-top:3px solid #55bf88}.stock-bucket.print{border-top:3px solid #ed6a46}.stock-bucket.is-drag-over{border-color:#9d91f5;background:#f8f7ff}.stock-bucket-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}.stock-bucket-head>div:first-child{flex:1}.stock-bucket-title{display:flex;align-items:center;gap:7px;color:#152034;font:700 15px 'Space Grotesk',sans-serif}.stock-bucket-title .dot{width:8px;height:8px;border-radius:50%;background:#55bf88}.stock-bucket.print .stock-bucket-title .dot{background:#ed6a46}.stock-bucket-subtitle{margin-top:4px;color:#8994a8;font:11px 'DM Sans',sans-serif}.stock-bucket-count{display:inline-flex;align-items:center;justify-content:center;min-width:25px;height:24px;padding:0 7px;border-radius:6px;background:#eef8f2;color:#319c6b;font:700 11px 'DM Sans',sans-serif}.stock-bucket.print .stock-bucket-count{background:#fff1eb;color:#d85f3e}.stock-bucket-export{height:30px!important;padding:0 9px!important;font-size:10px!important}.stock-bucket-list{display:grid;gap:8px}.stock-bucket-empty{display:grid;place-items:center;min-height:150px;border:1px dashed #dfe5ee;border-radius:8px;color:#a0a9b8;text-align:center;font:11px/1.5 'DM Sans',sans-serif}.stock-bucket .stock-result{margin:0;padding:10px;border:1px solid #e5e9f0;border-radius:9px;background:#fff;cursor:grab}.stock-bucket .stock-result.is-dragging{opacity:.45}.stock-drag-hint{margin:11px 0 0;color:#a0a9b8;text-align:center;font:10px 'DM Sans',sans-serif}@media(max-width:800px){.stock-buckets{grid-template-columns:1fr}}
+`;
+document.head.append(boardStyle);
+
+const state = { items: [], results: [], dragId: null };
 const makeId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
@@ -94,7 +100,7 @@ async function checkItem(id) {
     const response = await fetch(`${STOCK_API}/api/stock-search?article=${encodeURIComponent(parsed.article)}`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Не удалось открыть таблицу остатков');
-    state.results.push({ ...parsed, resultId: makeId(), itemId: id, source: item.file.name, page: item.page, row: item.row, matches: data });
+    state.results.push({ ...parsed, resultId: makeId(), itemId: id, source: item.file.name, page: item.page, row: item.row, matches: data, bucket: data.length ? 'assembly' : 'print' });
     item.status = data.length ? `Найдено коробок: ${data.length}` : 'В остатках не найдено';
     item.ok = Boolean(data.length);
   } catch (error) {
@@ -115,12 +121,12 @@ function removeResult(resultId) {
   render();
 }
 
-function exportResults() {
-  const found = state.results.filter(result => result.matches.length);
+function exportResults(bucket) {
+  const selected = state.results.filter(result => result.bucket === bucket);
   const rows = [];
-  if (state.mode === 'assembly') {
+  if (bucket === 'assembly') {
     const grouped = new Map();
-    for (const result of found) {
+    for (const result of selected) {
       const key = `${result.article}|${result.market}`;
       const previous = grouped.get(key) || { Артикул: result.article, Количество: 0, Маркетплейс: result.market, Короба: new Set() };
       previous.Количество += result.qty;
@@ -133,7 +139,7 @@ function exportResults() {
     for (const row of grouped.values()) rows.push({ ...row, Короба: [...row.Короба].join(', ') });
   } else {
     const grouped = new Map();
-    for (const result of found) {
+    for (const result of selected) {
       const key = `${result.article}|${result.market}`;
       const previous = grouped.get(key) || { Артикул: result.article, Количество: 0, Маркетплейс: result.market };
       previous.Количество += result.qty;
@@ -144,17 +150,28 @@ function exportResults() {
   if (!rows.length) return;
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.json_to_sheet(rows);
-  worksheet['!cols'] = state.mode === 'assembly' ? [{ wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 44 }] : [{ wch: 20 }, { wch: 14 }, { wch: 16 }];
-  XLSX.utils.book_append_sheet(workbook, worksheet, state.mode === 'assembly' ? 'На сборку' : 'На печать');
-  XLSX.writeFile(workbook, `PrintFlow_${state.mode === 'assembly' ? 'сборка' : 'печать'}.xlsx`);
+  worksheet['!cols'] = bucket === 'assembly' ? [{ wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 44 }] : [{ wch: 20 }, { wch: 14 }, { wch: 16 }];
+  XLSX.utils.book_append_sheet(workbook, worksheet, bucket === 'assembly' ? 'На сборку' : 'На печать');
+  XLSX.writeFile(workbook, `PrintFlow_${bucket === 'assembly' ? 'сборка' : 'печать'}.xlsx`);
+}
+
+function renderResult(result) {
+  const boxes = result.matches.length
+    ? result.matches.map(match => `<span class="stock-box">${escapeHtml(match.box || 'Коробка не указана')}${match.level ? ` · ${escapeHtml(match.level)}` : ''} · остаток ${Number(match.stock) || 0} шт.</span>`).join('')
+    : '<span class="stock-empty">В таблице остатков не найдено</span>';
+  return `<div class="stock-result" draggable="true" data-drag="${result.resultId}">${result.photo ? `<img class="stock-photo" src="${result.photo}" alt="Фото ${escapeHtml(result.article)}">` : '<div class="stock-photo" aria-hidden="true"></div>'}<div><div class="stock-result-main"><span>${escapeHtml(result.article)}</span><span class="stock-tag">${result.qty} шт. · ${escapeHtml(result.market)}</span><small>${escapeHtml(result.source)}, стр. ${result.page}, строка ${result.row}; PDF-коробка: ${escapeHtml(result.box)}</small></div><div class="stock-boxes">${boxes}</div></div><button class="stock-remove stock-result-remove" data-remove-result="${result.resultId}" type="button">Удалить</button></div>`;
+}
+
+function renderBucket(bucket, title, subtitle) {
+  const results = state.results.filter(result => result.bucket === bucket);
+  return `<section class="stock-bucket ${bucket}" data-bucket="${bucket}"><div class="stock-bucket-head"><div><div class="stock-bucket-title"><span class="dot"></span>${title}</div><div class="stock-bucket-subtitle">${subtitle}</div></div><span class="stock-bucket-count">${results.length}</span><button class="stock-export stock-bucket-export" data-export="${bucket}" type="button" ${results.length ? '' : 'disabled'}>Скачать Excel</button></div><div class="stock-bucket-list">${results.length ? results.map(renderResult).join('') : `<div class="stock-bucket-empty">Перетащите сюда позиции<br>или проверьте новый артикул</div>`}</div><div class="stock-drag-hint">Перетащите карточку в другую панель, если нужно изменить решение</div></section>`;
 }
 
 function render() {
   const panel = document.querySelector('.stock-panel');
   if (!panel) return;
   const files = state.items.map(item => `<div class="stock-file"><div class="stock-file-main"><span class="stock-pdf-icon">PDF</span><span class="stock-file-name" title="${escapeHtml(item.file.name)}">${escapeHtml(item.file.name)}</span></div><label class="stock-field"><span>Страница</span><input data-id="${item.id}" data-field="page" type="number" min="1" value="${item.page}" aria-label="Страница"></label><label class="stock-field"><span>Строка</span><input data-id="${item.id}" data-field="row" type="number" min="1" value="${item.row}" aria-label="Строка"></label><button data-check="${item.id}" type="button">Проверить</button><button class="stock-remove" data-remove="${item.id}" type="button">Удалить</button><span class="stock-file-status ${item.ok ? 'ok' : item.status && item.status !== 'Готово' ? 'error' : ''}">${escapeHtml(item.status || 'Укажите страницу и строку')}</span></div>`).join('');
-  const results = state.results.length ? `<div class="stock-results"><div class="stock-results-head"><h3>Результаты поиска</h3><span class="stock-results-count">Позиций: ${state.results.length}</span><div class="stock-mode"><button type="button" class="${state.mode === 'assembly' ? 'active' : ''}" data-mode="assembly">На сборку</button><button type="button" class="${state.mode === 'print' ? 'active' : ''}" data-mode="print">На печать</button></div></div>${state.results.map(result => `<div class="stock-result">${result.photo ? `<img class="stock-photo" src="${result.photo}" alt="Фото ${escapeHtml(result.article)}">` : '<div class="stock-photo" aria-hidden="true"></div>'}<div><div class="stock-result-main"><span>${escapeHtml(result.article)}</span><span class="stock-tag">${result.qty} шт. · ${escapeHtml(result.market)}</span><small>${escapeHtml(result.source)}, стр. ${result.page}, строка ${result.row}; PDF-коробка: ${escapeHtml(result.box)}</small></div><div class="stock-boxes">${result.matches.length ? result.matches.map(match => `<span class="stock-box">${escapeHtml(match.box || 'Коробка не указана')}${match.level ? ` · ${escapeHtml(match.level)}` : ''} · остаток ${Number(match.stock) || 0} шт.</span>`).join('') : '<span class="stock-empty">В таблице остатков не найдено</span>'}</div></div><button class="stock-remove stock-result-remove" data-remove-result="${result.resultId}" type="button">Удалить</button></div>`).join('')}<div class="stock-footer"><button class="stock-export" type="button" ${state.results.some(result => result.matches.length) ? '' : 'disabled'}>Скачать Excel</button></div></div>` : '';
-  panel.innerHTML = `<div class="panel-head"><div><h2>Проверка остатков</h2><p>Найдите артикулы из PDF в актуальной таблице склада</p></div><div class="step">03</div></div><p class="stock-intro">Загрузите несколько PDF-файлов. Для каждого укажите страницу и номер строки — система покажет фото, все найденные короба и подготовит Excel.</p><div class="stock-upload"><label class="stock-upload-button">Выбрать PDF-файлы<input id="stock-pdf-input" type="file" accept="application/pdf,.pdf" multiple></label><span class="stock-upload-hint">Можно выбрать несколько файлов</span></div><div class="stock-files">${files}</div>${results}`;
+  panel.innerHTML = `<div class="panel-head"><div><h2>Проверка остатков</h2><p>Найдите артикулы из PDF в актуальной таблице склада</p></div><div class="step">03</div></div><p class="stock-intro">Проверьте несколько строк PDF. Найденные в остатках позиции попадут в сборку, отсутствующие — в печать. Карточки можно перетаскивать между панелями.</p><div class="stock-upload"><label class="stock-upload-button">Выбрать PDF-файлы<input id="stock-pdf-input" type="file" accept="application/pdf,.pdf" multiple></label><span class="stock-upload-hint">Можно выбрать несколько файлов</span></div><div class="stock-files">${files}</div><div class="stock-buckets">${renderBucket('assembly', 'На сборку', 'Артикул найден в таблице остатков')}${renderBucket('print', 'На печать', 'Артикул отсутствует в таблице остатков')}</div>`;
   bindPanelEvents();
 }
 
@@ -165,9 +182,16 @@ function bindPanelEvents() {
   document.querySelectorAll('[data-remove]').forEach(button => { button.onclick = () => removeItem(button.dataset.remove); });
   document.querySelectorAll('[data-remove-result]').forEach(button => { button.onclick = () => removeResult(button.dataset.removeResult); });
   document.querySelectorAll('[data-field]').forEach(field => { field.onchange = () => { const item = state.items.find(candidate => candidate.id === field.dataset.id); if (item) item[field.dataset.field] = field.value; }; });
-  document.querySelectorAll('[data-mode]').forEach(button => { button.onclick = () => { state.mode = button.dataset.mode; render(); }; });
-  const exportButton = document.querySelector('.stock-export');
-  if (exportButton) exportButton.onclick = exportResults;
+  document.querySelectorAll('[data-export]').forEach(button => { button.onclick = () => exportResults(button.dataset.export); });
+  document.querySelectorAll('[data-drag]').forEach(card => {
+    card.ondragstart = event => { state.dragId = card.dataset.drag; card.classList.add('is-dragging'); event.dataTransfer?.setData('text/plain', state.dragId); };
+    card.ondragend = () => { state.dragId = null; card.classList.remove('is-dragging'); document.querySelectorAll('[data-bucket]').forEach(bucket => bucket.classList.remove('is-drag-over')); };
+  });
+  document.querySelectorAll('[data-bucket]').forEach(bucket => {
+    bucket.ondragover = event => { event.preventDefault(); bucket.classList.add('is-drag-over'); };
+    bucket.ondragleave = () => bucket.classList.remove('is-drag-over');
+    bucket.ondrop = event => { event.preventDefault(); const resultId = state.dragId || event.dataTransfer?.getData('text/plain'); const result = state.results.find(item => item.resultId === resultId); if (result) { result.bucket = bucket.dataset.bucket; render(); } };
+  });
 }
 
 function setup() {
