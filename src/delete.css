@@ -1,0 +1,1 @@
+.row-delete,.clear-history{border:1px solid #f0d5cc;background:#fff8f6;color:#c7644c;border-radius:6px;padding:6px 8px;font:600 10px 'DM Sans';cursor:pointer}.row-delete:hover,.clear-history:hover{background:#ed6a46;color:#fff;border-color:#ed6a46}.queue .tr:not(.th){grid-template-columns:2.3fr .75fr .75fr 1.05fr .4fr auto}
