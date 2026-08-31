@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import XLSX from 'xlsx';
-import Database from 'better-sqlite3';
+let LegacyDatabase=null; try{LegacyDatabase=(await import('better-sqlite3')).default}catch{}
 
 const app=express(); app.use(cors()); app.use(express.json());
 const BASE='\\\\Zzz\\проекты\\база1';
@@ -14,14 +14,14 @@ const MAP='C:\\Users\\Пользователь\\Downloads\\Расширения.
 const allowed=new Set(['.cdr','.tif']);
 const articleRe=/([A-Za-z]{2,4}[0-9]{3,4}\.A[0-9]+)\(([^)]+)\)/i;
 let jobs=[]; let WB_ROOT=DEFAULT_WB_ROOT; let OZON_ROOT=DEFAULT_OZON_ROOT;
-const DATA=path.join(process.cwd(),'data'); const DB_FILE=path.join(DATA,'printflow.sqlite'); const SETTINGS_FILE=path.join(DATA,'settings.json');
+const DATA=path.join(process.cwd(),'data'); const DB_FILE=path.join(DATA,'printflow.sqlite'); const JOBS_FILE=path.join(DATA,'jobs.json'); const AUDIT_FILE=path.join(DATA,'audit.json'); const SETTINGS_FILE=path.join(DATA,'settings.json');
 function validRoot(value){const p=String(value||'').trim();return p.length>=3&&(path.isAbsolute(p)||p.startsWith('\\\\'))}
 async function loadSettings(){try{const saved=JSON.parse(await fs.readFile(SETTINGS_FILE,'utf8'));if(validRoot(saved.wbRoot))WB_ROOT=path.normalize(saved.wbRoot);if(validRoot(saved.ozonRoot))OZON_ROOT=path.normalize(saved.ozonRoot)}catch{}}
 async function saveSettings(){await fs.mkdir(DATA,{recursive:true});await fs.writeFile(SETTINGS_FILE,JSON.stringify({wbRoot:WB_ROOT,ozonRoot:OZON_ROOT},null,2),'utf8')}
 function inside(child,parent){const c=path.resolve(child).toLowerCase(),p=path.resolve(parent).toLowerCase();return c===p||c.startsWith(p+path.sep)}
-async function loadJobs(){await fs.mkdir(DATA,{recursive:true});const db=new Database(DB_FILE);db.exec('CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, data TEXT NOT NULL);CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, article TEXT, destination TEXT, created_at TEXT NOT NULL)');jobs=db.prepare('SELECT data FROM jobs ORDER BY rowid DESC').all().map(x=>JSON.parse(x.data)).sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));db.close();if(!jobs.length){try{jobs=JSON.parse(await fs.readFile(path.join(DATA,'jobs.json'),'utf8'));await saveJobs()}catch{}}}
-async function saveJobs(){await fs.mkdir(DATA,{recursive:true});const db=new Database(DB_FILE);db.exec('CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, data TEXT NOT NULL);CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, article TEXT, destination TEXT, created_at TEXT NOT NULL)');const put=db.prepare('INSERT OR REPLACE INTO jobs (id,data) VALUES (?,?)');const tx=db.transaction(items=>{for(const j of items)put.run(String(j.id),JSON.stringify(j))});tx(jobs);db.close()}
-async function auditCopy(article,destination){const db=new Database(DB_FILE);db.prepare('INSERT INTO audit(action,article,destination,created_at) VALUES (?,?,?,?)').run('copy',article,destination,new Date().toISOString());db.close()}
+async function loadJobs(){await fs.mkdir(DATA,{recursive:true});if(LegacyDatabase&&await fs.access(DB_FILE).then(()=>true).catch(()=>false)){const db=new LegacyDatabase(DB_FILE);db.exec('CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, data TEXT NOT NULL)');jobs=db.prepare('SELECT data FROM jobs ORDER BY rowid DESC').all().map(x=>JSON.parse(x.data)).sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));db.close();await saveJobs();return}try{const saved=JSON.parse(await fs.readFile(JOBS_FILE,'utf8'));jobs=Array.isArray(saved)?saved.sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0)):[]}catch{jobs=[]}}
+async function saveJobs(){await fs.mkdir(DATA,{recursive:true});await fs.writeFile(JOBS_FILE,JSON.stringify(jobs,null,2),'utf8')}
+async function auditCopy(article,destination){let rows=[];try{const saved=JSON.parse(await fs.readFile(AUDIT_FILE,'utf8'));if(Array.isArray(saved))rows=saved}catch{}rows.unshift({id:Date.now(),action:'copy',article,destination,created_at:new Date().toISOString()});await fs.writeFile(AUDIT_FILE,JSON.stringify(rows.slice(0,500),null,2),'utf8')}
 async function renamedFilesExist(j){const root=String(j.market).toUpperCase()==='OZON'?OZON_ROOT:(j.files?.[0]?path.dirname(j.files[0]):'');if(!root)return false;const wanted=path.extname(j.files?.[0]||'').toLowerCase();const files=await walk(root);return files.filter(f=>path.basename(f).toUpperCase().includes(j.article)&&(!wanted||path.extname(f).toLowerCase()===wanted)).length>=Number(j.qty||1)}
 async function watchJobs(){let changed=false;for(const j of jobs){const renamed=await renamedFilesExist(j);if(j.status==='Забрано'&&renamed){j.status='Ожидает';delete j.takenAt;changed=true;continue}if(j.status==='Ожидает'||j.status==='В печати'){let exists=0;for(const f of j.files||[]){try{await fs.access(f);exists++}catch{}}if((j.files||[]).length&&exists===0&&!renamed){j.status='Забрано';j.takenAt=new Date().toISOString();changed=true}}}if(changed)await saveJobs()}
 
@@ -41,7 +41,7 @@ function articleInfo(file){
 }
 async function findArticleFiles(article){const m=article.match(/^([A-Za-z]{2,4}[0-9]{3,4})\.((?:A)[0-9]+)$/i); if(!m)return []; const dir=path.join(BASE,m[1].toUpperCase(),m[2].toUpperCase()); return walk(dir)}
 app.get('/api/health',(req,res)=>res.json({ok:true,base:BASE,print:PRINT,wbPrint:WB_ROOT,ozonPrint:OZON_ROOT}));
-app.get('/api/audit',async(req,res)=>{const db=new Database(DB_FILE);db.exec('CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, article TEXT, destination TEXT, created_at TEXT NOT NULL)');const rows=db.prepare('SELECT * FROM audit ORDER BY id DESC LIMIT 200').all();db.close();res.json(rows)});
+app.get('/api/audit',async(req,res)=>{try{const rows=JSON.parse(await fs.readFile(AUDIT_FILE,'utf8'));res.json(Array.isArray(rows)?rows.slice(0,200):[])}catch{res.json([])}});
 app.get('/api/settings',async(req,res)=>res.json({base:BASE,print:PRINT,map:MAP,allowed:[...allowed],refreshSeconds:5,wbRoot:WB_ROOT,ozonRoot:OZON_ROOT}));
 app.post('/api/settings',async(req,res)=>{const wbRoot=String(req.body?.wbRoot||'').trim(),ozonRoot=String(req.body?.ozonRoot||'').trim();if(!validRoot(wbRoot)||!validRoot(ozonRoot))return res.status(422).json({error:'Укажите корректные локальные или сетевые пути для WB и Ozon'});WB_ROOT=path.normalize(wbRoot);OZON_ROOT=path.normalize(ozonRoot);await saveSettings();res.json({ok:true,wbRoot:WB_ROOT,ozonRoot:OZON_ROOT})});
 app.get('/api/report',(req,res)=>{const from=String(req.query.from||'').trim(),to=String(req.query.to||'').trim();const list=jobs.filter(j=>{const d=new Date(j.createdAt||0);return(!from||d>=new Date(from+'T00:00:00'))&&(!to||d<=new Date(to+'T23:59:59'))});const total=list.reduce((s,j)=>s+j.qty,0);res.json({total,wb:list.filter(j=>j.market==='WB').reduce((s,j)=>s+j.qty,0),ozon:list.filter(j=>j.market==='OZON').reduce((s,j)=>s+j.qty,0),waiting:list.filter(j=>j.status==='Ожидает'||j.status==='В печати').reduce((s,j)=>s+j.qty,0),taken:list.filter(j=>j.status==='Забрано').reduce((s,j)=>s+j.qty,0),done:list.filter(j=>j.status==='Напечатано').reduce((s,j)=>s+j.qty,0),errors:list.filter(j=>j.status==='Ошибка').length,rows:list.length})});
