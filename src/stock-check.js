@@ -31,7 +31,22 @@ boardStyle.textContent = `
 `;
 document.head.append(boardStyle);
 
-const state = { items: [], results: [], dragId: null };
+const analyzerStyle = document.createElement('style');
+analyzerStyle.textContent = `
+.stock-analyzer{margin-bottom:24px;padding:16px;border:1px solid #dfe6f0;border-radius:12px;background:#f8fafc}
+.stock-analyzer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:13px}
+.stock-analyzer-title{color:#152034;font:700 16px 'Space Grotesk',sans-serif}.stock-analyzer-subtitle{margin-top:4px;color:#8994a8;font:11px 'DM Sans',sans-serif;line-height:1.45}
+.stock-analyzer-upload{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px;border:1px dashed #cfd9e7;border-radius:9px;background:#fff}
+.stock-analyzer-button{display:inline-flex;align-items:center;min-height:34px;border:1px solid #dfe6f0;border-radius:8px;background:#fff;color:#53617a;padding:0 11px;font:700 11px 'DM Sans',sans-serif;cursor:pointer}.stock-analyzer-button:hover{border-color:#edb39f;color:#d85f3e;background:#fff8f5}.stock-analyzer-button input{display:none}
+.stock-analyzer-status{color:#8994a8;font:11px 'DM Sans',sans-serif}.stock-analyzer-status.error{color:#c7644c}.stock-analyzer-status.ok{color:#319c6b}
+.stock-analysis-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;color:#53617a;font:11px 'DM Sans',sans-serif}.stock-analysis-summary strong{color:#152034;font:700 14px 'Space Grotesk',sans-serif}
+.stock-analysis-table{margin-top:12px;border:1px solid #e3e9f1;border-radius:10px;overflow:hidden;background:#fff}.stock-analysis-row{display:grid;grid-template-columns:minmax(170px,.9fr) 110px 90px minmax(280px,2fr);gap:12px;align-items:center;padding:12px 13px;border-top:1px solid #edf1f6;color:#53617a;font:11px 'DM Sans',sans-serif}.stock-analysis-row:first-child{border-top:0}.stock-analysis-row.header{background:#f8fafc;border-top:0;color:#98a3b3;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}.stock-analysis-article{color:#22304a;font-weight:700}.stock-analysis-market{display:inline-flex;width:max-content;padding:4px 7px;border-radius:6px;background:#edf8f2;color:#319c6b;font-weight:700}.stock-analysis-locations{display:flex;gap:6px;flex-wrap:wrap}.stock-analysis-location{display:inline-flex;align-items:center;gap:4px;padding:5px 7px;border:1px solid #e2e8ef;border-radius:6px;background:#fafbfc;color:#53617a}.stock-analysis-location b{color:#22304a}.stock-analysis-missing{color:#c7644c}.stock-analysis-delete{height:30px!important;padding:0 9px!important}
+@media(max-width:800px){.stock-analysis-row{grid-template-columns:minmax(150px,1fr) 90px 78px}.stock-analysis-row>div:last-child{grid-column:1/-1}}
+@media(max-width:560px){.stock-analysis-row{grid-template-columns:1fr 1fr}.stock-analysis-row.header{display:none}.stock-analysis-row>div:last-child{grid-column:1/-1}}
+`;
+document.head.append(analyzerStyle);
+
+const state = { items: [], results: [], analysis: [], analysisStatus: '', analysisStatusKind: '', analysisFileName: '', dragId: null };
 const makeId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
@@ -167,15 +182,64 @@ function renderBucket(bucket, title, subtitle) {
   return `<section class="stock-bucket ${bucket}" data-bucket="${bucket}"><div class="stock-bucket-head"><div><div class="stock-bucket-title"><span class="dot"></span>${title}</div><div class="stock-bucket-subtitle">${subtitle}</div></div><span class="stock-bucket-count">${results.length}</span><button class="stock-export stock-bucket-export" data-export="${bucket}" type="button" ${results.length ? '' : 'disabled'}>Скачать Excel</button></div><div class="stock-bucket-list">${results.length ? results.map(renderResult).join('') : `<div class="stock-bucket-empty">Перетащите сюда позиции<br>или проверьте новый артикул</div>`}</div><div class="stock-drag-hint">Перетащите карточку в другую панель, если нужно изменить решение</div></section>`;
 }
 
+function sheetValue(row, names) {
+  const entry = Object.entries(row).find(([key]) => names.includes(String(key).trim().toLowerCase()));
+  return entry?.[1] ?? '';
+}
+
+function renderAnalysis() {
+  const requestedTotal = state.analysis.reduce((sum, item) => sum + Number(item.requestedQty || 0), 0);
+  const foundCount = state.analysis.filter(item => item.found).length;
+  const rows = state.analysis.map(item => {
+    const locations = item.locations?.length
+      ? item.locations.map(location => `<span class="stock-analysis-location"><b>${escapeHtml(location.box || 'Коробка')}</b>${location.level ? ` · ${escapeHtml(location.level)}` : ''} · ${Number(location.stock) || 0} шт.</span>`).join('')
+      : '<span class="stock-analysis-missing">В таблице остатков не найдено</span>';
+    return `<div class="stock-analysis-row"><div class="stock-analysis-article">${escapeHtml(item.article)}</div><div>${Number(item.requestedQty) || 0} шт.</div><div><span class="stock-analysis-market">${escapeHtml(item.market || '—')}</span></div><div class="stock-analysis-locations">${locations}</div></div>`;
+  }).join('');
+  const status = state.analysisStatus ? `<span class="stock-analyzer-status ${state.analysisStatusKind}">${escapeHtml(state.analysisStatus)}</span>` : '<span class="stock-analyzer-status">Файл ещё не загружен</span>';
+  return `<section class="stock-analyzer"><div class="stock-analyzer-head"><div><div class="stock-analyzer-title">Анализ остатков из Excel</div><div class="stock-analyzer-subtitle">Загрузите список артикулов — система объединит повторы и покажет все короба с остатком.</div></div>${status}</div><div class="stock-analyzer-upload"><label class="stock-analyzer-button">Выбрать Excel-файл<input id="stock-analysis-input" type="file" accept=".xlsx,.xls"></label><span class="stock-upload-hint">Колонки: Артикул, Количество, Маркетплейс</span></div>${state.analysis.length ? `<div class="stock-analysis-summary"><strong>${state.analysis.length}</strong> позиций · нужно всего <strong>${requestedTotal}</strong> шт. · найдено в остатках <strong>${foundCount}</strong></div><div class="stock-analysis-table"><div class="stock-analysis-row header"><div>Артикул</div><div>Нужно</div><div>Маркетплейс</div><div>Короба и остаток</div></div>${rows}</div>` : ''}</section>`;
+}
+
 function render() {
   const panel = document.querySelector('.stock-panel');
   if (!panel) return;
   const files = state.items.map(item => `<div class="stock-file"><div class="stock-file-main"><span class="stock-pdf-icon">PDF</span><span class="stock-file-name" title="${escapeHtml(item.file.name)}">${escapeHtml(item.file.name)}</span></div><label class="stock-field"><span>Страница</span><input data-id="${item.id}" data-field="page" type="number" min="1" value="${item.page}" aria-label="Страница"></label><label class="stock-field"><span>Строка</span><input data-id="${item.id}" data-field="row" type="number" min="1" value="${item.row}" aria-label="Строка"></label><button data-check="${item.id}" type="button">Проверить</button><button class="stock-remove" data-remove="${item.id}" type="button">Удалить</button><span class="stock-file-status ${item.ok ? 'ok' : item.status && item.status !== 'Готово' ? 'error' : ''}">${escapeHtml(item.status || 'Укажите страницу и строку')}</span></div>`).join('');
-  panel.innerHTML = `<div class="panel-head"><div><h2>Проверка остатков</h2><p>Найдите артикулы из PDF в актуальной таблице склада</p></div><div class="step">03</div></div><p class="stock-intro">Проверьте несколько строк PDF. Найденные в остатках позиции попадут в сборку, отсутствующие — в печать. Карточки можно перетаскивать между панелями.</p><div class="stock-upload"><label class="stock-upload-button">Выбрать PDF-файлы<input id="stock-pdf-input" type="file" accept="application/pdf,.pdf" multiple></label><span class="stock-upload-hint">Можно выбрать несколько файлов</span></div><div class="stock-files">${files}</div><div class="stock-buckets">${renderBucket('assembly', 'На сборку', 'Артикул найден в таблице остатков')}${renderBucket('print', 'На печать', 'Артикул отсутствует в таблице остатков')}</div>`;
+  panel.innerHTML = `<div class="panel-head"><div><h2>Проверка остатков</h2><p>Найдите артикулы из PDF в актуальной таблице склада</p></div><div class="step">03</div></div><p class="stock-intro">Загрузите список из Excel или проверьте отдельные строки PDF. Найденные позиции попадут в сборку, отсутствующие — в печать.</p>${renderAnalysis()}<div class="stock-upload"><label class="stock-upload-button">Выбрать PDF-файлы<input id="stock-pdf-input" type="file" accept="application/pdf,.pdf" multiple></label><span class="stock-upload-hint">Можно выбрать несколько файлов</span></div><div class="stock-files">${files}</div><div class="stock-buckets">${renderBucket('assembly', 'На сборку', 'Артикул найден в таблице остатков')}${renderBucket('print', 'На печать', 'Артикул отсутствует в таблице остатков')}</div>`;
   bindPanelEvents();
 }
 
+async function analyzeStockFile(file) {
+  state.analysis = [];
+  state.analysisFileName = file.name;
+  state.analysisStatus = `Читаю ${file.name}…`;
+  state.analysisStatusKind = '';
+  render();
+  try {
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+    const rows = raw.map(row => ({
+      article: String(sheetValue(row, ['артикул', 'article'])).trim().toUpperCase(),
+      qty: Number(sheetValue(row, ['количество', 'qty', 'quantity'])),
+      market: String(sheetValue(row, ['маркетплейс', 'market'])).trim().toUpperCase()
+    })).filter(row => row.article && Number.isFinite(row.qty) && row.qty > 0);
+    if (!rows.length) throw new Error('Не найдены строки с колонками «Артикул» и «Количество»');
+    const response = await fetch(`${STOCK_API}/api/stock-analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Не удалось проанализировать остатки');
+    state.analysis = data;
+    state.analysisStatus = `Готово · ${data.length} позиций из Excel`;
+    state.analysisStatusKind = 'ok';
+  } catch (error) {
+    state.analysisStatus = error.message || 'Не удалось прочитать Excel';
+    state.analysisStatusKind = 'error';
+  }
+  render();
+}
+
 function bindPanelEvents() {
+  const analysisInput = document.querySelector('#stock-analysis-input');
+  if (analysisInput) analysisInput.onchange = () => { const file = analysisInput.files?.[0]; if (!file) return; analysisInput.value = ''; analyzeStockFile(file); };
   const input = document.querySelector('#stock-pdf-input');
   if (input) input.onchange = () => { const files = [...input.files]; if (!files.length) return; state.items.push(...files.map(file => ({ id: makeId(), file, page: 1, row: 1, status: 'Готово' }))); input.value = ''; render(); };
   document.querySelectorAll('[data-check]').forEach(button => { button.onclick = () => checkItem(button.dataset.check); });

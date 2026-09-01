@@ -37,6 +37,7 @@
 | Form | React component | `src/main.jsx` | create | create validation smoke check |
 | Scrollbar | Global application CSS | `src/theme.css` | default | computed style |
 | CRUD | `/api/jobs` + `src/delete.js` | `server.mjs` | delete/stay | full-flow smoke check |
+| Stock Excel analysis | `src/stock-check.js` + `/api/stock-analyze` | `server.mjs` + stock workbook | aggregate duplicates | uploaded workbook smoke check |
 
 ## Component behavior
 
@@ -51,6 +52,7 @@
 
 - Admin tables: History owns searchable, date-filtered, marketplace-filtered, status-filtered rows.
 - Exploratory lists: Stock-check results use separate «На сборку» and «На печать» buckets.
+- Excel analysis: uploaded rows are aggregated by article and marketplace; each result shows requested quantity and every stock location with its quantity.
 - URL state: transient local UI state; refresh reloads persisted jobs and recomputes queue/history classification.
 - Page size: render-all for the current internal dataset.
 - Empty/no-results/error/loading treatment: explicit empty message, inline error banner, and five-second refresh.
@@ -64,6 +66,7 @@
 | Delete | row «Удалить» | confirmation | same list | row disappears and total refreshes | error dialog | same list | `src/delete.js` |
 | Search | type in history search | local filter | same list | visible matching rows | no-results text | input retains focus | `src/admin.js` |
 | Upload/background job | choose Excel/PDF | processing message | preview/results | inline completion | inline error | uploader remains | `src/main.jsx`, `src/stock-check.js` |
+| Analyze stock workbook | choose Excel in stock check | reading and lookup message | same stock-check panel | article rows with boxes and quantities | inline error | keep uploaded source unchanged | `src/stock-check.js`, `server.mjs` |
 
 ## Navigation and responsive behavior
 
