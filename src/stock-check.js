@@ -145,7 +145,7 @@ function removeResult(resultId) {
   render();
 }
 
-function exportResults(bucket) {
+async function exportResults(bucket) {
   const selected = state.results.filter(result => result.bucket === bucket);
   const rows = [];
   if (bucket === 'assembly') {
@@ -156,11 +156,11 @@ function exportResults(bucket) {
       previous.Количество += result.qty;
       for (const match of result.matches) {
         const label = match.level ? `${match.box} (${match.level})` : match.box;
-        if (label) previous.Короба.add(label);
+        if (label) previous.Короба.add(`${label} — ${Number(match.stock) || 0} шт.`);
       }
       grouped.set(key, previous);
     }
-    for (const row of grouped.values()) rows.push({ ...row, Короба: [...row.Короба].join(', ') });
+    for (const row of grouped.values()) rows.push({ ...row, Короба: [...row.Короба].join('\n') });
   } else {
     const grouped = new Map();
     for (const result of selected) {
@@ -172,11 +172,18 @@ function exportResults(bucket) {
     rows.push(...grouped.values());
   }
   if (!rows.length) return;
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const StyledXLSX = await import('xlsx-js-style');
+  const workbook = StyledXLSX.utils.book_new();
+  const worksheet = StyledXLSX.utils.json_to_sheet(rows);
   worksheet['!cols'] = bucket === 'assembly' ? [{ wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 44 }] : [{ wch: 20 }, { wch: 14 }, { wch: 16 }];
-  XLSX.utils.book_append_sheet(workbook, worksheet, bucket === 'assembly' ? 'На сборку' : 'На печать');
-  XLSX.writeFile(workbook, `PrintFlow_${bucket === 'assembly' ? 'сборка' : 'печать'}.xlsx`);
+  if (bucket === 'assembly') {
+    worksheet['!rows'] = [{ hpt: 24 }, ...rows.map(row => ({ hpt: Math.max(22, String(row.Короба || '').split('\n').length * 18) }))];
+    for (let index = 2; index <= rows.length + 1; index += 1) {
+      if (worksheet[`D${index}`]) worksheet[`D${index}`].s = { alignment: { wrapText: true, vertical: 'top' } };
+    }
+  }
+  StyledXLSX.utils.book_append_sheet(workbook, worksheet, bucket === 'assembly' ? 'На сборку' : 'На печать');
+  StyledXLSX.writeFile(workbook, `PrintFlow_${bucket === 'assembly' ? 'сборка' : 'печать'}.xlsx`);
 }
 
 function renderResult(result) {

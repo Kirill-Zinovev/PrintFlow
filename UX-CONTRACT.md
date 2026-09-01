@@ -52,7 +52,7 @@
 
 - Admin tables: History owns searchable, date-filtered, marketplace-filtered, status-filtered rows.
 - Exploratory lists: Stock-check results use separate «На сборку» and «На печать» buckets.
-- Excel analysis: uploaded rows are aggregated by article and marketplace; each result shows requested quantity and every stock location with its quantity, without photos. Results start in «На сборку» when stock is found and in «На печать» when it is missing; each card can be deleted or moved by drag-and-drop or its explicit move button. The assembly export keeps each box and its quantity on a separate line within one cell.
+- Excel analysis: uploaded rows are aggregated by article and marketplace; each result shows requested quantity and every stock location with its quantity, without photos. Results start in «На сборку» when stock is found and in «На печать» when it is missing; each card can be deleted or moved by drag-and-drop or its explicit move button. Assembly exports from both PDF and Excel checks keep each box and its stock quantity on a separate line within one cell.
 - URL state: transient local UI state; refresh reloads persisted jobs and recomputes queue/history classification.
 - Page size: render-all for the current internal dataset.
 - Empty/no-results/error/loading treatment: explicit empty message, inline error banner, and five-second refresh.
