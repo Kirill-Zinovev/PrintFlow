@@ -10,12 +10,13 @@ const BASE='\\\\Zzz\\проекты\\база1';
 const PRINT='\\\\Zzz\\печать\\WB';
 const DEFAULT_WB_ROOT=path.join(PRINT,'!1.СРОЧНО WB','срочка за 28.08');
 const DEFAULT_OZON_ROOT=path.join(PRINT,'!2. Срочно OZON','СРОЧНО за 29.08');
-const MAP=path.join(process.cwd(),'Расширения.xlsx');
+const APP_ROOT=process.env.PRINTFLOW_APP_ROOT||process.cwd();
+const MAP=process.env.PRINTFLOW_MAP||path.join(APP_ROOT,'Расширения.xlsx');
 const STOCKS_FILE='\\\\Zzz\\проекты\\менеджеры\\FBS\\Остатки Калейдоскоп (Актуальный).xlsx';
 const allowed=new Set(['.cdr','.tif']);
 const articleRe=/([A-Za-z]{2,4}[0-9]{3,4}\.A[0-9]+)\(([^)]+)\)/i;
 let jobs=[]; let WB_ROOT=DEFAULT_WB_ROOT; let OZON_ROOT=DEFAULT_OZON_ROOT;
-const DATA=path.join(process.cwd(),'data'); const DB_FILE=path.join(DATA,'printflow.sqlite'); const JOBS_FILE=path.join(DATA,'jobs.json'); const AUDIT_FILE=path.join(DATA,'audit.json'); const SETTINGS_FILE=path.join(DATA,'settings.json');
+const DATA=process.env.PRINTFLOW_DATA_DIR||path.join(APP_ROOT,'data'); const DB_FILE=path.join(DATA,'printflow.sqlite'); const JOBS_FILE=path.join(DATA,'jobs.json'); const AUDIT_FILE=path.join(DATA,'audit.json'); const SETTINGS_FILE=path.join(DATA,'settings.json');
 function validRoot(value){const p=String(value||'').trim();return p.length>=3&&(path.isAbsolute(p)||p.startsWith('\\\\'))}
 async function loadSettings(){try{const saved=JSON.parse(await fs.readFile(SETTINGS_FILE,'utf8'));if(validRoot(saved.wbRoot))WB_ROOT=path.normalize(saved.wbRoot);if(validRoot(saved.ozonRoot))OZON_ROOT=path.normalize(saved.ozonRoot)}catch{}}
 async function saveSettings(){await fs.mkdir(DATA,{recursive:true});await fs.writeFile(SETTINGS_FILE,JSON.stringify({wbRoot:WB_ROOT,ozonRoot:OZON_ROOT},null,2),'utf8')}

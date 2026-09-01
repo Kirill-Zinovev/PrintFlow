@@ -6,7 +6,7 @@ import'./styles.css';
 import'./settings.js';
 import'./stock-check.js';
 import'./history.js';
-const api=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?'http://localhost:4174':window.location.protocol+'//'+window.location.hostname+':4174';
+const api=window.location.protocol==='file:'||window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?'http://127.0.0.1:4174':window.location.protocol+'//'+window.location.hostname+':4174';
 const map={CBI:'CDR Белая интерьерка',CB:'CDR Белая',CP:'CDR ПРОЗРАЧКА',CPB:'CDR ПРОЗРАЧКА глянец с белым',B:'БУМАГА',G:'Голография',D:'Двусторонние',U3:'УФ ПВХ 3 мм',U5:'УФ ПВХ 5 мм',FP:'УФ планшет',DTF:'ДТФ'};
 function App(){const[a,setA]=useState(''),[m,setM]=useState('WB'),[q,setQ]=useState(1),[rows,setRows]=useState([]),[msg,setMsg]=useState(''),[preview,setPreview]=useState([]),[batchMsg,setBatchMsg]=useState(''),[found,setFound]=useState(null),[dateFrom,setDateFrom]=useState(''),[dateTo,setDateTo]=useState('');
 const typed=useMemo(()=>{const x=a.trim().toUpperCase().match(/^([A-Z]{2,4}\d{3,4}\.A\d+)(?:\(([^)]+)\))?$/);return x?{article:x[1],ext:x[2]||''}:null},[a]);
