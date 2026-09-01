@@ -203,9 +203,10 @@ function removeAnalysis(analysisId) {
   render();
 }
 
-function exportAnalysis(bucket) {
+async function exportAnalysis(bucket) {
   const selected = state.analysis.filter(item => item.bucket === bucket);
   if (!selected.length) return;
+  const StyledXLSX = await import('xlsx-js-style');
   const rows = selected.map(item => {
     const row = { Артикул: item.article, Количество: Number(item.requestedQty) || 0, Маркетплейс: item.market || '' };
     if (bucket === 'assembly') {
@@ -216,8 +217,8 @@ function exportAnalysis(bucket) {
     }
     return row;
   });
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = StyledXLSX.utils.book_new();
+  const worksheet = StyledXLSX.utils.json_to_sheet(rows);
   worksheet['!cols'] = bucket === 'assembly'
     ? [{ wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 48 }]
     : [{ wch: 20 }, { wch: 14 }, { wch: 16 }];
@@ -227,8 +228,8 @@ function exportAnalysis(bucket) {
       if (worksheet[`D${index}`]) worksheet[`D${index}`].s = { alignment: { wrapText: true, vertical: 'top' } };
     }
   }
-  XLSX.utils.book_append_sheet(workbook, worksheet, bucket === 'assembly' ? 'На сборку' : 'На печать');
-  XLSX.writeFile(workbook, `PrintFlow_анализ_${bucket === 'assembly' ? 'сборка' : 'печать'}.xlsx`);
+  StyledXLSX.utils.book_append_sheet(workbook, worksheet, bucket === 'assembly' ? 'На сборку' : 'На печать');
+  StyledXLSX.writeFile(workbook, `PrintFlow_анализ_${bucket === 'assembly' ? 'сборка' : 'печать'}.xlsx`);
 }
 
 function renderAnalysisCard(item) {
