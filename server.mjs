@@ -1,11 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import fs from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
 import path from 'node:path';
 import XLSX from 'xlsx';
 let LegacyDatabase=null; try{LegacyDatabase=(await import('better-sqlite3')).default}catch{}
 
 const app=express(); app.use(cors()); app.use(express.json());
+const PORT=Number(process.env.PRINTFLOW_PORT||4174);
 const BASE='\\\\Zzz\\проекты\\база1';
 const PRINT='\\\\Zzz\\печать\\WB';
 const DEFAULT_WB_ROOT=path.join(PRINT,'!1.СРОЧНО WB','срочка за 28.08');
@@ -20,6 +22,7 @@ const DATA=process.env.PRINTFLOW_DATA_DIR||path.join(APP_ROOT,'data'); const DB_
 function validRoot(value){const p=String(value||'').trim();return p.length>=3&&(path.isAbsolute(p)||p.startsWith('\\\\'))}
 async function loadSettings(){try{const saved=JSON.parse(await fs.readFile(SETTINGS_FILE,'utf8'));if(validRoot(saved.wbRoot))WB_ROOT=path.normalize(saved.wbRoot);if(validRoot(saved.ozonRoot))OZON_ROOT=path.normalize(saved.ozonRoot)}catch{}}
 async function saveSettings(){await fs.mkdir(DATA,{recursive:true});await fs.writeFile(SETTINGS_FILE,JSON.stringify({wbRoot:WB_ROOT,ozonRoot:OZON_ROOT},null,2),'utf8')}
+async function inspectPath(value){const raw=String(value||'').trim();if(!validRoot(raw))return {ok:false,status:'invalid',message:'Укажите корректный локальный или сетевой путь'};const target=path.normalize(raw);try{const stat=await fs.stat(target);if(!stat.isDirectory())return {ok:false,status:'file',path:target,message:'По этому адресу находится файл, а не папка'};await fs.access(target,fsConstants.R_OK|fsConstants.W_OK);return {ok:true,status:'available',path:target,message:'Папка доступна для чтения и записи'}}catch(error){if(error?.code==='ENOENT'){try{await fs.access(path.dirname(target),fsConstants.R_OK|fsConstants.W_OK);return {ok:false,status:'missing',creatable:true,path:target,message:'Папка не найдена — будет создана при печати'}}catch{}}return {ok:false,status:'unavailable',path:target,message:'Папка недоступна или нет прав на запись'}}}
 function inside(child,parent){const c=path.resolve(child).toLowerCase(),p=path.resolve(parent).toLowerCase();return c===p||c.startsWith(p+path.sep)}
 async function loadJobs(){await fs.mkdir(DATA,{recursive:true});if(LegacyDatabase&&await fs.access(DB_FILE).then(()=>true).catch(()=>false)){const db=new LegacyDatabase(DB_FILE);db.exec('CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, data TEXT NOT NULL)');jobs=db.prepare('SELECT data FROM jobs ORDER BY rowid DESC').all().map(x=>JSON.parse(x.data)).sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));db.close();await saveJobs();return}try{const saved=JSON.parse(await fs.readFile(JOBS_FILE,'utf8'));jobs=Array.isArray(saved)?saved.sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0)):[]}catch{jobs=[]}}
 async function saveJobs(){await fs.mkdir(DATA,{recursive:true});await fs.writeFile(JOBS_FILE,JSON.stringify(jobs,null,2),'utf8')}
@@ -47,6 +50,7 @@ async function findArticleFiles(article){const m=article.match(/^([A-Za-z]{2,4}[
 app.get('/api/health',(req,res)=>res.json({ok:true,base:BASE,print:PRINT,wbPrint:WB_ROOT,ozonPrint:OZON_ROOT}));
 app.get('/api/audit',async(req,res)=>{try{const rows=JSON.parse(await fs.readFile(AUDIT_FILE,'utf8'));res.json(Array.isArray(rows)?rows.slice(0,200):[])}catch{res.json([])}});
 app.get('/api/settings',async(req,res)=>res.json({base:BASE,print:PRINT,map:MAP,allowed:[...allowed],refreshSeconds:5,wbRoot:WB_ROOT,ozonRoot:OZON_ROOT}));
+app.post('/api/settings/check-path',async(req,res)=>res.json(await inspectPath(req.body?.path)));
 app.post('/api/settings',async(req,res)=>{const wbRoot=String(req.body?.wbRoot||'').trim(),ozonRoot=String(req.body?.ozonRoot||'').trim();if(!validRoot(wbRoot)||!validRoot(ozonRoot))return res.status(422).json({error:'Укажите корректные локальные или сетевые пути для WB и Ozon'});WB_ROOT=path.normalize(wbRoot);OZON_ROOT=path.normalize(ozonRoot);await saveSettings();res.json({ok:true,wbRoot:WB_ROOT,ozonRoot:OZON_ROOT})});
 app.get('/api/stock-search',async(req,res)=>{const article=String(req.query.article||'').trim().toUpperCase();if(!article)return res.json([]);try{const wb=XLSX.readFile(STOCKS_FILE,{cellDates:false}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{defval:''}),byLocation=new Map();for(const row of rows){if(String(row['Артикул']||'').trim().toUpperCase()!==article)continue;const box=String(row['Коробка']||'').trim(),level=String(row['Этаж/БОКС']||'').trim(),key=box+'|'+level,previous=byLocation.get(key)||{article,stock:0,box,level};previous.stock+=Number(row['Количество']||0)||0;byLocation.set(key,previous)}res.json([...byLocation.values()])}catch(error){res.status(500).json({error:`Не удалось открыть таблицу остатков: ${error.message}`})}});
 app.get('/api/report',(req,res)=>{const from=String(req.query.from||'').trim(),to=String(req.query.to||'').trim();const list=jobs.filter(j=>{const d=new Date(j.createdAt||0);return(!from||d>=new Date(from+'T00:00:00'))&&(!to||d<=new Date(to+'T23:59:59'))});const total=list.reduce((s,j)=>s+j.qty,0);res.json({total,wb:list.filter(j=>j.market==='WB').reduce((s,j)=>s+j.qty,0),ozon:list.filter(j=>j.market==='OZON').reduce((s,j)=>s+j.qty,0),waiting:list.filter(j=>j.status==='Ожидает'||j.status==='В печати').reduce((s,j)=>s+j.qty,0),taken:list.filter(j=>j.status==='Забрано').reduce((s,j)=>s+j.qty,0),done:list.filter(j=>j.status==='Напечатано').reduce((s,j)=>s+j.qty,0),errors:list.filter(j=>j.status==='Ошибка').length,rows:list.length})});
@@ -87,4 +91,4 @@ app.delete('/api/jobs/:id',async(req,res)=>{const before=jobs.length;jobs=jobs.f
 app.delete('/api/jobs/by-key',async(req,res)=>{const {article,time}=req.body||{},normalizedArticle=String(article||'').trim().toUpperCase();let i=jobs.findIndex(x=>x.article===normalizedArticle&&x.time===time);if(i<0)i=jobs.findIndex(x=>x.article===normalizedArticle);if(i<0)return res.status(404).json({error:'Запись не найдена'});jobs.splice(i,1);await saveJobs();res.json({ok:true})});
 app.delete('/api/jobs',async(req,res)=>{jobs=[];await saveJobs();res.json({ok:true})});
 app.get('/api/jobs',async(req,res)=>{await watchJobs();let out=[...jobs].sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));const q=String(req.query.q||'').trim().toUpperCase(),market=String(req.query.market||'').toUpperCase(),status=String(req.query.status||'');if(q)out=out.filter(j=>j.article.includes(q));if(market&&market!=='ALL')out=out.filter(j=>j.market===market);if(status&&status!=='ALL')out=out.filter(j=>j.status===status);res.json(out.map(j=>({...j,archived:isArchivedJob(j)})))});
-await loadSettings(); await loadJobs(); setInterval(watchJobs,5000); app.listen(4174,'0.0.0.0',()=>console.log('PrintFlow API on 4174'));
+await loadSettings(); await loadJobs(); setInterval(watchJobs,5000); app.listen(PORT,'0.0.0.0',()=>console.log(`PrintFlow API on ${PORT}`));

@@ -1,4 +1,5 @@
 const { app, BrowserWindow, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -46,10 +47,32 @@ function createWindow() {
   windowRef.loadFile(appFile('dist', 'index.html'));
 }
 
+function checkForUpdates() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('error', error => console.error('PrintFlow update check failed:', error.message));
+  autoUpdater.on('update-downloaded', async () => {
+    const result = await dialog.showMessageBox(windowRef, {
+      type: 'info',
+      title: 'Доступно обновление PrintFlow',
+      message: 'Новая версия PrintFlow уже загружена.',
+      detail: 'Перезапустить приложение сейчас или обновить его при следующем запуске?',
+      buttons: ['Перезапустить и обновить', 'Позже'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (result.response === 0) autoUpdater.quitAndInstall();
+  });
+  autoUpdater.checkForUpdates().catch(() => {});
+}
+
 app.whenReady().then(async () => {
   try {
     await startApi();
     createWindow();
+    checkForUpdates();
   } catch (error) {
     dialog.showErrorBox('PrintFlow', error.message);
     app.quit();
