@@ -46,6 +46,15 @@ analyzerStyle.textContent = `
 `;
 document.head.append(analyzerStyle);
 
+const polishStyle = document.createElement('style');
+polishStyle.textContent = `
+.stock-analysis-card{border-radius:10px;box-shadow:0 2px 8px rgba(28,42,68,.03);transition:border-color .15s,box-shadow .15s,transform .15s}.stock-analysis-card:hover{border-color:#cfd9e7;box-shadow:0 5px 14px rgba(28,42,68,.06)}
+.stock-analysis-card-actions button,.stock-bucket .stock-result-remove{display:inline-flex;align-items:center;justify-content:center;min-height:32px;border:1px solid #dfe6f0;border-radius:8px;background:#fff;color:#53617a;padding:0 10px;font:600 11px 'DM Sans',sans-serif;cursor:pointer;transition:background .15s,border-color .15s,color .15s,transform .15s}.stock-analysis-card-actions button:hover,.stock-bucket .stock-result-remove:hover{border-color:#c8d2e0;background:#f8fafc;color:#33415a}.stock-analysis-card-actions button:focus-visible,.stock-bucket .stock-result-remove:focus-visible{outline:3px solid rgba(242,107,71,.22);outline-offset:2px}.stock-analysis-card-actions button:active,.stock-bucket .stock-result-remove:active{transform:translateY(1px)}
+.stock-analysis-move{height:32px!important;padding:0 10px!important;color:#6c5bce!important;border-color:#dcd7ff!important;background:#faf9ff!important;font-size:10px!important}.stock-analysis-move:hover{border-color:#bfb5ff!important;background:#f3f1ff!important;color:#5847bc!important}.stock-analysis-delete{height:32px!important;padding:0 10px!important;color:#cf684f!important;border-color:#f0c8bd!important;background:#fffaf8!important;font-size:10px!important}.stock-analysis-delete:hover{border-color:#e9a997!important;background:#fff2ee!important;color:#b84e36!important}
+@media(prefers-reduced-motion:reduce){.stock-analysis-card,.stock-analysis-card-actions button,.stock-bucket .stock-result-remove{transition:none!important}.stock-analysis-card-actions button:active,.stock-bucket .stock-result-remove:active{transform:none}}
+`;
+document.head.append(polishStyle);
+
 const state = { items: [], results: [], analysis: [], analysisStatus: '', analysisStatusKind: '', analysisFileName: '', dragId: null, analysisDragId: null };
 const makeId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -203,7 +212,7 @@ function exportAnalysis(bucket) {
       row['Короба и остаток'] = (item.locations || []).map(location => {
         const label = location.level ? `${location.box} (${location.level})` : location.box;
         return `${label || 'Коробка не указана'} — ${Number(location.stock) || 0} шт.`;
-      }).join(', ');
+      }).join('\n');
     }
     return row;
   });
@@ -212,6 +221,12 @@ function exportAnalysis(bucket) {
   worksheet['!cols'] = bucket === 'assembly'
     ? [{ wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 48 }]
     : [{ wch: 20 }, { wch: 14 }, { wch: 16 }];
+  if (bucket === 'assembly') {
+    worksheet['!rows'] = [{ hpt: 24 }, ...rows.map(row => ({ hpt: Math.max(22, String(row['Короба и остаток'] || '').split('\n').length * 18) }))];
+    for (let index = 2; index <= rows.length + 1; index += 1) {
+      if (worksheet[`D${index}`]) worksheet[`D${index}`].s = { alignment: { wrapText: true, vertical: 'top' } };
+    }
+  }
   XLSX.utils.book_append_sheet(workbook, worksheet, bucket === 'assembly' ? 'На сборку' : 'На печать');
   XLSX.writeFile(workbook, `PrintFlow_анализ_${bucket === 'assembly' ? 'сборка' : 'печать'}.xlsx`);
 }
