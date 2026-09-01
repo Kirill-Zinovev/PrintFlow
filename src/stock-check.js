@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.min.mjs', import.meta.url).toString();
 
-const STOCK_API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+const STOCK_API = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:4174'
   : `${window.location.protocol}//${window.location.hostname}:4174`;
 
