@@ -40,13 +40,13 @@ analyzerStyle.textContent = `
 .stock-analyzer-button{display:inline-flex;align-items:center;min-height:34px;border:1px solid #dfe6f0;border-radius:8px;background:#fff;color:#53617a;padding:0 11px;font:700 11px 'DM Sans',sans-serif;cursor:pointer}.stock-analyzer-button:hover{border-color:#edb39f;color:#d85f3e;background:#fff8f5}.stock-analyzer-button input{display:none}
 .stock-analyzer-status{color:#8994a8;font:11px 'DM Sans',sans-serif}.stock-analyzer-status.error{color:#c7644c}.stock-analyzer-status.ok{color:#319c6b}
 .stock-analysis-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;color:#53617a;font:11px 'DM Sans',sans-serif}.stock-analysis-summary strong{color:#152034;font:700 14px 'Space Grotesk',sans-serif}
-.stock-analysis-table{margin-top:12px;border:1px solid #e3e9f1;border-radius:10px;overflow:hidden;background:#fff}.stock-analysis-row{display:grid;grid-template-columns:minmax(170px,.9fr) 110px 90px minmax(280px,2fr);gap:12px;align-items:center;padding:12px 13px;border-top:1px solid #edf1f6;color:#53617a;font:11px 'DM Sans',sans-serif}.stock-analysis-row:first-child{border-top:0}.stock-analysis-row.header{background:#f8fafc;border-top:0;color:#98a3b3;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}.stock-analysis-article{color:#22304a;font-weight:700}.stock-analysis-market{display:inline-flex;width:max-content;padding:4px 7px;border-radius:6px;background:#edf8f2;color:#319c6b;font-weight:700}.stock-analysis-locations{display:flex;gap:6px;flex-wrap:wrap}.stock-analysis-location{display:inline-flex;align-items:center;gap:4px;padding:5px 7px;border:1px solid #e2e8ef;border-radius:6px;background:#fafbfc;color:#53617a}.stock-analysis-location b{color:#22304a}.stock-analysis-missing{color:#c7644c}.stock-analysis-delete{height:30px!important;padding:0 9px!important}
-@media(max-width:800px){.stock-analysis-row{grid-template-columns:minmax(150px,1fr) 90px 78px}.stock-analysis-row>div:last-child{grid-column:1/-1}}
-@media(max-width:560px){.stock-analysis-row{grid-template-columns:1fr 1fr}.stock-analysis-row.header{display:none}.stock-analysis-row>div:last-child{grid-column:1/-1}}
+.stock-analysis-buckets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}.stock-analysis-bucket{min-width:0;min-height:190px;border:1px solid #e4e9f0;border-radius:11px;padding:13px;background:#fbfcfe;transition:border-color .15s,background .15s}.stock-analysis-bucket.assembly{border-top:3px solid #55bf88}.stock-analysis-bucket.print{border-top:3px solid #ed6a46}.stock-analysis-bucket.is-drag-over{border-color:#9d91f5;background:#f8f7ff}.stock-analysis-bucket-head{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px}.stock-analysis-bucket-head>div:first-child{flex:1}.stock-analysis-bucket-title{display:flex;align-items:center;gap:7px;color:#152034;font:700 14px 'Space Grotesk',sans-serif}.stock-analysis-bucket-title .dot{width:8px;height:8px;border-radius:50%;background:#55bf88}.stock-analysis-bucket.print .stock-analysis-bucket-title .dot{background:#ed6a46}.stock-analysis-bucket-subtitle{margin-top:4px;color:#8994a8;font:10px/1.4 'DM Sans',sans-serif}.stock-analysis-bucket-count{display:inline-flex;align-items:center;justify-content:center;min-width:25px;height:23px;padding:0 7px;border-radius:6px;background:#eef8f2;color:#319c6b;font:700 11px 'DM Sans',sans-serif}.stock-analysis-bucket.print .stock-analysis-bucket-count{background:#fff1eb;color:#d85f3e}.stock-analysis-bucket-export{height:30px!important;padding:0 9px!important;font-size:10px!important}.stock-analysis-bucket-list{display:grid;gap:8px}.stock-analysis-bucket-empty{display:grid;place-items:center;min-height:130px;border:1px dashed #dfe5ee;border-radius:8px;color:#a0a9b8;text-align:center;font:11px/1.5 'DM Sans',sans-serif}.stock-analysis-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start;padding:11px;border:1px solid #e5e9f0;border-radius:9px;background:#fff;cursor:grab}.stock-analysis-card.is-dragging{opacity:.45}.stock-analysis-card-main{min-width:0;color:#53617a;font:11px/1.45 'DM Sans',sans-serif}.stock-analysis-card-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:#22304a;font-weight:700}.stock-analysis-card-qty{color:#53617a;font-weight:500}.stock-analysis-card-locations{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.stock-analysis-card-location{display:inline-flex;align-items:center;gap:4px;padding:5px 7px;border:1px solid #e2e8ef;border-radius:6px;background:#fafbfc;color:#53617a}.stock-analysis-card-location b{color:#22304a}.stock-analysis-card-missing{display:block;margin-top:8px;color:#c7644c}.stock-analysis-card-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.stock-analysis-move{height:28px!important;padding:0 8px!important;color:#7c6fe0!important;font-size:10px!important}.stock-analysis-delete{height:28px!important;padding:0 8px!important}.stock-analysis-drag-hint{margin:10px 0 0;color:#a0a9b8;text-align:center;font:10px 'DM Sans',sans-serif}
+@media(max-width:800px){.stock-analysis-buckets{grid-template-columns:1fr}.stock-analysis-card{grid-template-columns:minmax(0,1fr) auto}}
+@media(max-width:560px){.stock-analysis-card{grid-template-columns:1fr}.stock-analysis-card-actions{justify-content:flex-start}}
 `;
 document.head.append(analyzerStyle);
 
-const state = { items: [], results: [], analysis: [], analysisStatus: '', analysisStatusKind: '', analysisFileName: '', dragId: null };
+const state = { items: [], results: [], analysis: [], analysisStatus: '', analysisStatusKind: '', analysisFileName: '', dragId: null, analysisDragId: null };
 const makeId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
@@ -187,17 +187,56 @@ function sheetValue(row, names) {
   return entry?.[1] ?? '';
 }
 
+function removeAnalysis(analysisId) {
+  state.analysis = state.analysis.filter(item => item.analysisId !== analysisId);
+  state.analysisStatus = state.analysis.length ? `Готово · ${state.analysis.length} позиций из Excel` : 'Все позиции удалены';
+  state.analysisStatusKind = state.analysis.length ? 'ok' : '';
+  render();
+}
+
+function exportAnalysis(bucket) {
+  const selected = state.analysis.filter(item => item.bucket === bucket);
+  if (!selected.length) return;
+  const rows = selected.map(item => {
+    const row = { Артикул: item.article, Количество: Number(item.requestedQty) || 0, Маркетплейс: item.market || '' };
+    if (bucket === 'assembly') {
+      row['Короба и остаток'] = (item.locations || []).map(location => {
+        const label = location.level ? `${location.box} (${location.level})` : location.box;
+        return `${label || 'Коробка не указана'} — ${Number(location.stock) || 0} шт.`;
+      }).join(', ');
+    }
+    return row;
+  });
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  worksheet['!cols'] = bucket === 'assembly'
+    ? [{ wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 48 }]
+    : [{ wch: 20 }, { wch: 14 }, { wch: 16 }];
+  XLSX.utils.book_append_sheet(workbook, worksheet, bucket === 'assembly' ? 'На сборку' : 'На печать');
+  XLSX.writeFile(workbook, `PrintFlow_анализ_${bucket === 'assembly' ? 'сборка' : 'печать'}.xlsx`);
+}
+
+function renderAnalysisCard(item) {
+  const locations = item.locations?.length
+    ? `<div class="stock-analysis-card-locations">${item.locations.map(location => `<span class="stock-analysis-card-location"><b>${escapeHtml(location.box || 'Коробка')}</b>${location.level ? ` · ${escapeHtml(location.level)}` : ''} · ${Number(location.stock) || 0} шт.</span>`).join('')}</div>`
+    : '<span class="stock-analysis-card-missing">В таблице остатков не найдено</span>';
+  const nextBucket = item.bucket === 'assembly' ? 'print' : 'assembly';
+  const nextLabel = nextBucket === 'assembly' ? 'На сборку' : 'На печать';
+  return `<div class="stock-analysis-card" draggable="true" data-analysis-drag="${item.analysisId}"><div class="stock-analysis-card-main"><div class="stock-analysis-card-title"><span class="stock-analysis-article">${escapeHtml(item.article)}</span><span class="stock-analysis-market">${escapeHtml(item.market || '—')}</span><span class="stock-analysis-card-qty">нужно ${Number(item.requestedQty) || 0} шт.</span></div>${locations}</div><div class="stock-analysis-card-actions"><button class="stock-analysis-move" data-analysis-move="${item.analysisId}" data-analysis-target="${nextBucket}" type="button">${nextLabel}</button><button class="stock-remove stock-analysis-delete" data-remove-analysis="${item.analysisId}" type="button">Удалить</button></div></div>`;
+}
+
+function renderAnalysisBucket(bucket, title, subtitle) {
+  const items = state.analysis.filter(item => item.bucket === bucket);
+  const total = items.reduce((sum, item) => sum + (Number(item.requestedQty) || 0), 0);
+  return `<section class="stock-analysis-bucket ${bucket}" data-analysis-bucket="${bucket}"><div class="stock-analysis-bucket-head"><div><div class="stock-analysis-bucket-title"><span class="dot"></span>${title}</div><div class="stock-analysis-bucket-subtitle">${subtitle}</div></div><span class="stock-analysis-bucket-count" title="Количество позиций">${items.length} · ${total} шт.</span><button class="stock-export stock-analysis-bucket-export" data-export-analysis="${bucket}" type="button" ${items.length ? '' : 'disabled'}>Скачать Excel</button></div><div class="stock-analysis-bucket-list">${items.length ? items.map(renderAnalysisCard).join('') : `<div class="stock-analysis-bucket-empty">Перетащите сюда позицию<br>или измените решение кнопкой</div>`}</div><div class="stock-analysis-drag-hint">Перетащите карточку в соседнюю панель, если нужно изменить решение</div></section>`;
+}
+
 function renderAnalysis() {
   const requestedTotal = state.analysis.reduce((sum, item) => sum + Number(item.requestedQty || 0), 0);
-  const foundCount = state.analysis.filter(item => item.found).length;
-  const rows = state.analysis.map(item => {
-    const locations = item.locations?.length
-      ? item.locations.map(location => `<span class="stock-analysis-location"><b>${escapeHtml(location.box || 'Коробка')}</b>${location.level ? ` · ${escapeHtml(location.level)}` : ''} · ${Number(location.stock) || 0} шт.</span>`).join('')
-      : '<span class="stock-analysis-missing">В таблице остатков не найдено</span>';
-    return `<div class="stock-analysis-row"><div class="stock-analysis-article">${escapeHtml(item.article)}</div><div>${Number(item.requestedQty) || 0} шт.</div><div><span class="stock-analysis-market">${escapeHtml(item.market || '—')}</span></div><div class="stock-analysis-locations">${locations}</div></div>`;
-  }).join('');
+  const assemblyCount = state.analysis.filter(item => item.bucket === 'assembly').length;
+  const printCount = state.analysis.filter(item => item.bucket === 'print').length;
   const status = state.analysisStatus ? `<span class="stock-analyzer-status ${state.analysisStatusKind}">${escapeHtml(state.analysisStatus)}</span>` : '<span class="stock-analyzer-status">Файл ещё не загружен</span>';
-  return `<section class="stock-analyzer"><div class="stock-analyzer-head"><div><div class="stock-analyzer-title">Анализ остатков из Excel</div><div class="stock-analyzer-subtitle">Загрузите список артикулов — система объединит повторы и покажет все короба с остатком.</div></div>${status}</div><div class="stock-analyzer-upload"><label class="stock-analyzer-button">Выбрать Excel-файл<input id="stock-analysis-input" type="file" accept=".xlsx,.xls"></label><span class="stock-upload-hint">Колонки: Артикул, Количество, Маркетплейс</span></div>${state.analysis.length ? `<div class="stock-analysis-summary"><strong>${state.analysis.length}</strong> позиций · нужно всего <strong>${requestedTotal}</strong> шт. · найдено в остатках <strong>${foundCount}</strong></div><div class="stock-analysis-table"><div class="stock-analysis-row header"><div>Артикул</div><div>Нужно</div><div>Маркетплейс</div><div>Короба и остаток</div></div>${rows}</div>` : ''}</section>`;
+  return `<section class="stock-analyzer"><div class="stock-analyzer-head"><div><div class="stock-analyzer-title">Анализ остатков из Excel</div><div class="stock-analyzer-subtitle">Загрузите список артикулов — система объединит повторы и сразу разделит позиции по наличию.</div></div>${status}</div><div class="stock-analyzer-upload"><label class="stock-analyzer-button">Выбрать Excel-файл<input id="stock-analysis-input" type="file" accept=".xlsx,.xls"></label><span class="stock-upload-hint">Колонки: Артикул, Количество, Маркетплейс</span></div>${state.analysis.length ? `<div class="stock-analysis-summary"><strong>${state.analysis.length}</strong> позиций · нужно всего <strong>${requestedTotal}</strong> шт. · на сборку <strong>${assemblyCount}</strong> · на печать <strong>${printCount}</strong></div><div class="stock-analysis-buckets">${renderAnalysisBucket('assembly', 'На сборку', 'Артикул найден в таблице остатков')}${renderAnalysisBucket('print', 'На печать', 'Артикул отсутствует в таблице остатков')}</div>` : ''}</section>`;
 }
 
 function render() {
@@ -227,7 +266,7 @@ async function analyzeStockFile(file) {
     const response = await fetch(`${STOCK_API}/api/stock-analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Не удалось проанализировать остатки');
-    state.analysis = data;
+    state.analysis = data.map(item => ({ ...item, analysisId: makeId(), bucket: item.found ? 'assembly' : 'print' }));
     state.analysisStatus = `Готово · ${data.length} позиций из Excel`;
     state.analysisStatusKind = 'ok';
   } catch (error) {
@@ -245,8 +284,10 @@ function bindPanelEvents() {
   document.querySelectorAll('[data-check]').forEach(button => { button.onclick = () => checkItem(button.dataset.check); });
   document.querySelectorAll('[data-remove]').forEach(button => { button.onclick = () => removeItem(button.dataset.remove); });
   document.querySelectorAll('[data-remove-result]').forEach(button => { button.onclick = () => removeResult(button.dataset.removeResult); });
+  document.querySelectorAll('[data-remove-analysis]').forEach(button => { button.onclick = () => removeAnalysis(button.dataset.removeAnalysis); });
   document.querySelectorAll('[data-field]').forEach(field => { field.onchange = () => { const item = state.items.find(candidate => candidate.id === field.dataset.id); if (item) item[field.dataset.field] = field.value; }; });
   document.querySelectorAll('[data-export]').forEach(button => { button.onclick = () => exportResults(button.dataset.export); });
+  document.querySelectorAll('[data-export-analysis]').forEach(button => { button.onclick = () => exportAnalysis(button.dataset.exportAnalysis); });
   document.querySelectorAll('[data-drag]').forEach(card => {
     card.ondragstart = event => { state.dragId = card.dataset.drag; card.classList.add('is-dragging'); event.dataTransfer?.setData('text/plain', state.dragId); };
     card.ondragend = () => { state.dragId = null; card.classList.remove('is-dragging'); document.querySelectorAll('[data-bucket]').forEach(bucket => bucket.classList.remove('is-drag-over')); };
@@ -255,6 +296,18 @@ function bindPanelEvents() {
     bucket.ondragover = event => { event.preventDefault(); bucket.classList.add('is-drag-over'); };
     bucket.ondragleave = () => bucket.classList.remove('is-drag-over');
     bucket.ondrop = event => { event.preventDefault(); const resultId = state.dragId || event.dataTransfer?.getData('text/plain'); const result = state.results.find(item => item.resultId === resultId); if (result) { result.bucket = bucket.dataset.bucket; render(); } };
+  });
+  document.querySelectorAll('[data-analysis-drag]').forEach(card => {
+    card.ondragstart = event => { state.analysisDragId = card.dataset.analysisDrag; card.classList.add('is-dragging'); event.dataTransfer?.setData('text/plain', state.analysisDragId); };
+    card.ondragend = () => { state.analysisDragId = null; card.classList.remove('is-dragging'); document.querySelectorAll('[data-analysis-bucket]').forEach(bucket => bucket.classList.remove('is-drag-over')); };
+  });
+  document.querySelectorAll('[data-analysis-move]').forEach(button => {
+    button.onclick = () => { const item = state.analysis.find(candidate => candidate.analysisId === button.dataset.analysisMove); if (item) { item.bucket = button.dataset.analysisTarget; render(); } };
+  });
+  document.querySelectorAll('[data-analysis-bucket]').forEach(bucket => {
+    bucket.ondragover = event => { event.preventDefault(); bucket.classList.add('is-drag-over'); };
+    bucket.ondragleave = () => bucket.classList.remove('is-drag-over');
+    bucket.ondrop = event => { event.preventDefault(); const analysisId = state.analysisDragId || event.dataTransfer?.getData('text/plain'); const item = state.analysis.find(candidate => candidate.analysisId === analysisId); if (item) { item.bucket = bucket.dataset.analysisBucket; render(); } };
   });
 }
 
