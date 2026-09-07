@@ -1,10 +1,11 @@
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import * as XLSX from 'xlsx';
+import { createNavIcon } from './nav-icons.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.min.mjs', import.meta.url).toString();
 
 const STOCK_API = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:4174'
+  ? 'http://127.0.0.1:4174'
   : `${window.location.protocol}//${window.location.hostname}:4174`;
 
 const style = document.createElement('style');
@@ -58,6 +59,18 @@ document.head.append(polishStyle);
 const state = { items: [], results: [], analysis: [], analysisStatus: '', analysisStatusKind: '', analysisFileName: '', dragId: null, analysisDragId: null };
 const makeId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+const shortPdfFileName = value => {
+  const baseName = String(value || 'PDF').split(/[\\/]/).pop();
+  const datedName = baseName.match(/(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}(?:-\d{2})?\.pdf)$/i);
+  if (datedName) return datedName[1];
+  return baseName.replace(/^Удал[её]нные_артикулы_БОКС[_ -]*/i, '');
+};
+const formatPdfSource = result => {
+  const fileName = shortPdfFileName(result.source);
+  const page = Number(result.page) || 0;
+  const totalPages = Number(result.pages) || 0;
+  return `${fileName} · стр. ${page}${totalPages ? ` из ${totalPages}` : ''} · строка ${Number(result.row) || 0}`;
+};
 
 function getPdfRows(textContent) {
   const lines = [];
@@ -102,7 +115,7 @@ async function extractPdfRow(file, pageNumber, rowNumber) {
   if (pageNumber < 1 || pageNumber > pdf.numPages) throw new Error(`В файле ${file.name} только ${pdf.numPages} страниц`);
   const page = await pdf.getPage(pageNumber);
   const rows = getPdfRows(await page.getTextContent());
-  const rowPattern = /^\d+\s+([A-ZА-Я0-9]{2,12}[._-][A-ZА-Я0-9-]+)\s+(\d+(?:[.,]\d+)?)\s+(WB|OZON)\s+(.+)$/i;
+  const rowPattern = /^\d+\s+([A-ZА-Я]{2,6}\d{3,5}\.A\d+(?:\([^)]*\))?)\s+(\d+(?:[.,]\d+)?)\s+(WB|OZON)\s+(.+)$/i;
   const prefix = new RegExp(`^${Number(rowNumber)}\\b`);
   const exactRow = rows.find(row => prefix.test(row.text));
   const dataRows = rows.filter(row => rowPattern.test(row.text));
@@ -111,7 +124,7 @@ async function extractPdfRow(file, pageNumber, rowNumber) {
   const match = row.text.match(rowPattern);
   if (!match) throw new Error(`Не удалось распознать строку: ${row.text}`);
   const photo = await renderPdfPhoto(page, row.y);
-  return { article: match[1].toUpperCase(), qty: Number(match[2].replace(',', '.')), market: match[3].toUpperCase(), box: match[4].trim(), photo, pdfRow: Number(row.text.match(/^\d+/)?.[0] || rowNumber) };
+  return { article: match[1].toUpperCase(), qty: Number(match[2].replace(',', '.')), market: match[3].toUpperCase(), box: match[4].trim(), photo, pages: pdf.numPages, pdfRow: Number(row.text.match(/^\d+/)?.[0] || rowNumber) };
 }
 
 async function checkItem(id) {
@@ -121,10 +134,11 @@ async function checkItem(id) {
   render();
   try {
     const parsed = await extractPdfRow(item.file, Number(item.page), Number(item.row));
+    item.pages = parsed.pages;
     const response = await fetch(`${STOCK_API}/api/stock-search?article=${encodeURIComponent(parsed.article)}`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Не удалось открыть таблицу остатков');
-    state.results.push({ ...parsed, resultId: makeId(), itemId: id, source: item.file.name, page: item.page, row: item.row, matches: data, bucket: data.length ? 'assembly' : 'print' });
+    state.results.unshift({ ...parsed, resultId: makeId(), itemId: id, source: item.file.name, page: item.page, row: item.row, matches: data, bucket: data.length ? 'assembly' : 'print' });
     item.status = data.length ? `Найдено коробок: ${data.length}` : 'В остатках не найдено';
     item.ok = Boolean(data.length);
   } catch (error) {
@@ -154,13 +168,16 @@ async function exportResults(bucket) {
       const key = `${result.article}|${result.market}`;
       const previous = grouped.get(key) || { Артикул: result.article, Количество: 0, Маркетплейс: result.market, Короба: new Set() };
       previous.Количество += result.qty;
+      previous['Страница и строка PDF'] ||= new Map();
+      const sourceKey = `${result.source}|${result.page}|${result.row}`;
+      previous['Страница и строка PDF'].set(sourceKey, formatPdfSource(result));
       for (const match of result.matches) {
         const label = match.level ? `${match.box} (${match.level})` : match.box;
         if (label) previous.Короба.add(`${label} — ${Number(match.stock) || 0} шт.`);
       }
       grouped.set(key, previous);
     }
-    for (const row of grouped.values()) rows.push({ ...row, Короба: [...row.Короба].join('\n') });
+    for (const row of grouped.values()) rows.push({ ...row, Короба: [...row.Короба].join('\n'), 'Страница и строка PDF': [...row['Страница и строка PDF'].values()].join('\n') });
   } else {
     const grouped = new Map();
     for (const result of selected) {
@@ -175,11 +192,12 @@ async function exportResults(bucket) {
   const StyledXLSX = await import('xlsx-js-style');
   const workbook = StyledXLSX.utils.book_new();
   const worksheet = StyledXLSX.utils.json_to_sheet(rows);
-  worksheet['!cols'] = bucket === 'assembly' ? [{ wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 44 }] : [{ wch: 20 }, { wch: 14 }, { wch: 16 }];
+  worksheet['!cols'] = bucket === 'assembly' ? [{ wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 44 }, { wch: 34 }] : [{ wch: 20 }, { wch: 14 }, { wch: 16 }];
   if (bucket === 'assembly') {
-    worksheet['!rows'] = [{ hpt: 24 }, ...rows.map(row => ({ hpt: Math.max(22, String(row.Короба || '').split('\n').length * 18) }))];
+    worksheet['!rows'] = [{ hpt: 24 }, ...rows.map(row => ({ hpt: Math.max(22, Math.max(String(row.Короба || '').split('\n').length, String(row['Страница и строка PDF'] || '').split('\n').length) * 18) }))];
     for (let index = 2; index <= rows.length + 1; index += 1) {
       if (worksheet[`D${index}`]) worksheet[`D${index}`].s = { alignment: { wrapText: true, vertical: 'top' } };
+      if (worksheet[`E${index}`]) worksheet[`E${index}`].s = { alignment: { wrapText: true, vertical: 'top' } };
     }
   }
   StyledXLSX.utils.book_append_sheet(workbook, worksheet, bucket === 'assembly' ? 'На сборку' : 'На печать');
@@ -190,7 +208,7 @@ function renderResult(result) {
   const boxes = result.matches.length
     ? result.matches.map(match => `<span class="stock-box">${escapeHtml(match.box || 'Коробка не указана')}${match.level ? ` · ${escapeHtml(match.level)}` : ''} · остаток ${Number(match.stock) || 0} шт.</span>`).join('')
     : '<span class="stock-empty">В таблице остатков не найдено</span>';
-  return `<div class="stock-result" draggable="true" data-drag="${result.resultId}">${result.photo ? `<img class="stock-photo" src="${result.photo}" alt="Фото ${escapeHtml(result.article)}">` : '<div class="stock-photo" aria-hidden="true"></div>'}<div><div class="stock-result-main"><span>${escapeHtml(result.article)}</span><span class="stock-tag">${result.qty} шт. · ${escapeHtml(result.market)}</span><small>${escapeHtml(result.source)}, стр. ${result.page}, строка ${result.row}; PDF-коробка: ${escapeHtml(result.box)}</small></div><div class="stock-boxes">${boxes}</div></div><button class="stock-remove stock-result-remove" data-remove-result="${result.resultId}" type="button">Удалить</button></div>`;
+  return `<div class="stock-result" draggable="true" data-drag="${result.resultId}">${result.photo ? `<img class="stock-photo" src="${result.photo}" alt="Фото ${escapeHtml(result.article)}">` : '<div class="stock-photo" aria-hidden="true"></div>'}<div><div class="stock-result-main"><span>${escapeHtml(result.article)}</span><span class="stock-tag">${result.qty} шт. · ${escapeHtml(result.market)}</span><small>${escapeHtml(formatPdfSource(result))}; PDF-коробка: ${escapeHtml(result.box)}</small></div><div class="stock-boxes">${boxes}</div></div><button class="stock-remove stock-result-remove" data-remove-result="${result.resultId}" type="button">Удалить</button></div>`;
 }
 
 function renderBucket(bucket, title, subtitle) {
@@ -303,7 +321,7 @@ function bindPanelEvents() {
   const analysisInput = document.querySelector('#stock-analysis-input');
   if (analysisInput) analysisInput.onchange = () => { const file = analysisInput.files?.[0]; if (!file) return; analysisInput.value = ''; analyzeStockFile(file); };
   const input = document.querySelector('#stock-pdf-input');
-  if (input) input.onchange = () => { const files = [...input.files]; if (!files.length) return; state.items.push(...files.map(file => ({ id: makeId(), file, page: 1, row: 1, status: 'Готово' }))); input.value = ''; render(); };
+  if (input) input.onchange = () => { const files = [...input.files]; if (!files.length) return; state.items.unshift(...files.map(file => ({ id: makeId(), file, page: 1, row: 1, status: 'Готово' }))); input.value = ''; render(); };
   document.querySelectorAll('[data-check]').forEach(button => { button.onclick = () => checkItem(button.dataset.check); });
   document.querySelectorAll('[data-remove]').forEach(button => { button.onclick = () => removeItem(button.dataset.remove); });
   document.querySelectorAll('[data-remove-result]').forEach(button => { button.onclick = () => removeResult(button.dataset.removeResult); });
@@ -340,13 +358,13 @@ function setup() {
   if (!main || !nav || document.querySelector('.stock-nav')) return;
   const link = document.createElement('a');
   link.className = 'stock-nav';
-  link.textContent = 'Проверка остатков';
+  link.append(createNavIcon('boxes'), document.createTextNode('Проверка остатков'));
   nav.append(link);
   const panel = document.createElement('section');
   panel.className = 'panel stock-panel';
   main.append(panel);
-  const regular = [...main.children].filter(child => child !== panel);
-  const showStock = () => { regular.forEach(child => { child.style.display = 'none'; }); panel.classList.add('is-visible'); nav.querySelectorAll('a').forEach(item => item.classList.remove('active')); link.classList.add('active'); render(); };
+  const regular = [...main.children].filter(child => child !== panel && !child.classList.contains('pdf-batch-panel'));
+  const showStock = () => { window.dispatchEvent(new CustomEvent('printflow:navigation', { detail: { view: 'stock' } })); document.body.classList.remove('pdf-reconcile-open'); document.querySelector('main')?.classList.remove('pdf-reconcile-active'); regular.forEach(child => { child.style.display = 'none'; }); const pdfPanel = document.querySelector('.pdf-batch-panel'); pdfPanel?.classList.remove('is-visible'); pdfPanel?.style.setProperty('display', 'none'); const writeoffPanel = document.querySelector('.stock-writeoff-panel'); writeoffPanel?.classList.remove('is-visible'); writeoffPanel?.style.setProperty('display', 'none'); panel.style.removeProperty('display'); panel.classList.add('is-visible'); nav.querySelectorAll('a').forEach(item => item.classList.remove('active')); link.classList.add('active'); render(); };
   const showMain = () => { regular.forEach(child => { child.style.display = ''; }); panel.classList.remove('is-visible'); link.classList.remove('active'); nav.querySelector('a')?.classList.add('active'); };
   link.onclick = showStock;
 

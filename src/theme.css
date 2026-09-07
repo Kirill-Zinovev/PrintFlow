@@ -101,15 +101,6 @@ nav a.active svg {
   position: relative;
 }
 
-.stock-nav::before {
-  content: '◇';
-  width: 17px;
-  color: #7d8ba1;
-  font-size: 16px;
-  line-height: 1;
-  text-align: center;
-}
-
 main {
   max-width: 1440px;
   padding: 30px 44px 54px;
@@ -349,6 +340,11 @@ select:focus-visible {
 
   nav a {
     justify-content: center;
+    font-size: 0;
+  }
+
+  .brand > div:last-child {
+    display: none;
   }
 
   nav a svg {
@@ -394,4 +390,28 @@ select:focus-visible {
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+}
+aside{position:sticky;top:0;height:100vh;flex:none}
+
+.history-view{overflow:visible}
+.history-view .queue-head{position:sticky;top:0;z-index:5;margin-top:-22px;margin-right:-23px;margin-left:-23px;padding:22px 23px 16px;background:#fff;border-bottom:1px solid var(--pf-soft-border);box-shadow:0 6px 14px rgba(28,42,68,.06)}
+
+@media (max-width: 600px){
+  .history-view .queue-head{margin-top:-18px;margin-right:-14px;margin-left:-14px;padding:18px 14px 14px}
+}
+
+.current-queue{overflow:visible}
+.history-view .table .tr.th{display:none}
+.current-queue .queue-head{position:sticky;top:0;z-index:7;margin-top:-22px;margin-right:-23px;margin-left:-23px;padding:22px 23px 16px;background:#fff;border-bottom:1px solid var(--pf-soft-border);box-shadow:0 6px 14px rgba(28,42,68,.06)}
+.current-queue .table .tr.th{position:sticky;top:var(--current-queue-head-height,96px);z-index:6;min-height:48px;background:#f8fafc;box-shadow:0 5px 12px rgba(28,42,68,.07)}
+.current-queue .table .tr.th>span{min-width:0}
+.current-queue .table .tr.th input,.current-queue .table .tr.th select{width:100%;height:32px;min-width:0;border:1px solid var(--pf-border);border-radius:var(--pf-radius-control);background:#fff;color:var(--pf-ink);padding:0 8px;font:600 10px 'DM Sans',sans-serif;text-transform:none;letter-spacing:0}
+.current-queue .table .tr.th input::placeholder{color:var(--pf-muted);opacity:1}
+.current-queue .table .tr.th input:focus-visible,.current-queue .table .tr.th select:focus-visible{outline:3px solid #ed6a4630;outline-offset:1px;border-color:#ed6a46}
+.current-queue .table .tr.th>span:nth-child(3){display:flex;align-items:center}
+
+@media (max-width: 600px){
+  .current-queue .queue-head{margin-top:-18px;margin-right:-14px;margin-left:-14px;padding:18px 14px 14px}
+  .current-queue .table .tr.th{min-height:40px;top:var(--current-queue-head-height,120px)}
+  .current-queue .table .tr.th input,.current-queue .table .tr.th select{height:34px;padding:0 5px;font-size:9px}
 }

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -42,10 +42,19 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       sandbox: true,
+      preload: appFile('electron', 'preload.cjs'),
     },
   });
   windowRef.loadFile(appFile('dist', 'index.html'));
 }
+
+ipcMain.handle('select-stock-file', async () => {
+  const result = await dialog.showOpenDialog(windowRef, {
+    properties: ['openFile'],
+    filters: [{ name: 'Excel-файлы', extensions: ['xlsx', 'xls'] }],
+  });
+  return result.canceled ? '' : result.filePaths[0] || '';
+});
 
 function checkForUpdates() {
   if (!app.isPackaged) return;
